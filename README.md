@@ -22,6 +22,24 @@ node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
 
 El servidor se niega a iniciar si `SESSION_SECRET` está vacío.
 
+## Migrar datos SQLite a Supabase
+
+La migración conserva el archivo SQLite original. Copia la cadena PostgreSQL del proyecto desde Supabase (Database > Connect) a `SUPABASE_DB_URL` en `.env`. Esta variable debe contener la cadena de conexión de la base de datos, no una clave `anon` o `service_role`, y debe mantenerse privada.
+
+Aplica `supabase/schema.sql` en el SQL Editor de Supabase. Luego revisa cuántos registros se importarían, sin escribir en Supabase:
+
+```powershell
+npm run db:migrate:supabase
+```
+
+Cuando la vista previa sea correcta y el destino esté vacío, ejecuta la importación transaccional:
+
+```powershell
+npm run db:migrate:supabase -- --apply
+```
+
+El importador se niega a combinar datos si encuentra registros en cualquiera de las tablas de destino. La aplicación aún usa la capa SQLite; la importación por sí sola no cambia la conexión del servidor. La conversión de rutas y transacciones a PostgreSQL debe completarse antes de apuntar la aplicación a Supabase.
+
 Configura los valores de `.env` según el entorno:
 
 | Variable | Uso | Valor predeterminado |
@@ -30,6 +48,7 @@ Configura los valores de `.env` según el entorno:
 | `NODE_ENV` | Entorno de ejecución | `development` |
 | `SESSION_SECRET` | Firma de cookies de sesión; obligatorio | Sin valor |
 | `DB_PATH` | Archivo SQLite; puede ser una ruta absoluta o relativa al proyecto | `facturacion.db` |
+| `SUPABASE_DB_URL` | Conexión PostgreSQL de Supabase; solo la usa el importador | Sin valor |
 | `LOGIN_RATE_LIMIT` | Intentos de login por ventana | `5` |
 | `BACKUP_DIR` | Directorio para respaldos; puede ser absoluto o relativo al proyecto | `backups` |
 | `CORS_ORIGIN` | Orígenes externos autorizados separados por coma; déjalo vacío para mismo origen | Vacío |

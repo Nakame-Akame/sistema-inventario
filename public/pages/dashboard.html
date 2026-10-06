@@ -1,74 +1,135 @@
 <div class="page active" id="page-dashboard">
-    <div class="page-intro">
-      <div><p class="eyebrow">RESUMEN COMERCIAL</p><h2>Tu operación, de un vistazo</h2></div>
-      <span class="period-chip"><span class="status-dot"></span> Actividad del mes</span>
-    </div>
-    <div class="stats-grid">
-      <div class="stat-card blue">
-        <div class="stat-label">Ventas hoy</div>
-        <div class="stat-value blue mono" id="stat-hoy">S/ 0.00</div>
-        <div class="stat-sub">IGV incluido</div>
+  <div class="supabase-dashboard">
+    <div class="supabase-platform-shell">
+      <div class="supabase-main-panel">
+        <div class="supabase-header">
+          <h1>Sistema de inventario</h1>
+          <div class="chip-link">
+            <span>https://d...supabase.co</span>
+            <button type="button">Copy</button>
+          </div>
+        </div>
+
+        <div class="supabase-grid">
+          <div class="supabase-stat-card">
+            <div class="supabase-card-label">STATUS</div>
+            <div class="supabase-status-row">
+              <span class="supabase-status-dot"></span>
+              <strong>Healthy</strong>
+            </div>
+          </div>
+
+          <div class="supabase-stat-card">
+            <div class="supabase-card-label">COMPUTE</div>
+            <div class="supabase-chip small">Nano</div>
+          </div>
+
+          <div class="supabase-stat-card">
+            <div class="supabase-card-label">GITHUB</div>
+            <div class="supabase-mini-link">Nakame-Akame/sistema-facturacion</div>
+          </div>
+
+          <div class="supabase-stat-card">
+            <div class="supabase-card-label">RECENT BRANCH</div>
+            <div class="supabase-muted">No branches</div>
+          </div>
+
+          <div class="supabase-stat-card">
+            <div class="supabase-card-label">LAST MIGRATION</div>
+            <div class="supabase-muted">No migrations</div>
+          </div>
+
+          <div class="supabase-stat-card">
+            <div class="supabase-card-label">LAST BACKUP</div>
+            <div class="supabase-muted">No backups</div>
+          </div>
+
+          <div class="supabase-stat-card dynamic hidden-metric" aria-hidden="true">
+            <div class="supabase-card-label">Ventas hoy</div>
+            <div id="stat-hoy">S/ 0.00</div>
+          </div>
+
+          <div class="supabase-stat-card dynamic hidden-metric" aria-hidden="true">
+            <div class="supabase-card-label">Ventas del mes</div>
+            <div id="stat-mes">S/ 0.00</div>
+          </div>
+        </div>
       </div>
-      <div class="stat-card green">
-        <div class="stat-label">Ventas del mes</div>
-        <div class="stat-value green mono" id="stat-mes">S/ 0.00</div>
-        <div class="stat-sub">IGV incluido</div>
-      </div>
-      <div class="stat-card blue">
-        <div class="stat-label">Clientes</div>
-        <div class="stat-value blue" id="stat-clientes">0</div>
-        <div class="stat-sub">registrados</div>
-      </div>
-      <div class="stat-card green">
-        <div class="stat-label">Productos</div>
-        <div class="stat-value green" id="stat-productos">0</div>
-        <div class="stat-sub">en catálogo</div>
-      </div>
-      <div class="stat-card yellow">
-        <div class="stat-label">Stock bajo</div>
-        <div class="stat-value yellow" id="stat-stock">0</div>
-        <div class="stat-sub">productos ≤ 5 uds</div>
-      </div>
-      <div class="stat-card blue">
-        <div class="stat-label">Facturas totales</div>
-        <div class="stat-value blue" id="stat-facturas">0</div>
-        <div class="stat-sub">emitidas</div>
-      </div>
-      <div class="stat-card red">
-        <div class="stat-label">Por cobrar (crédito)</div>
-        <div class="stat-value red mono" id="stat-por-cobrar">S/ 0.00</div>
-        <div class="stat-sub" id="stat-por-cobrar-sub">pendiente</div>
+
+      <div class="supabase-side-panel">
+        <div class="supabase-side-tools">
+          <button type="button" aria-label="Expand">↗</button>
+          <button type="button" aria-label="Refresh">⟳</button>
+        </div>
+
+        <div class="supabase-db-card">
+          <div class="supabase-db-badge">Primary Database</div>
+          <div class="supabase-db-row">
+            <span class="supabase-db-icon">◫</span>
+            <span class="supabase-db-name">East US (North Virginia)</span>
+            <span class="supabase-db-flag">🇺🇸</span>
+          </div>
+          <div class="supabase-db-meta">us-east-1.t3.nano</div>
+        </div>
+
+        <div class="supabase-metrics-row">
+          <span>CPU 2%</span>
+          <span>Disk 13%</span>
+          <span>RAM 49%</span>
+          <span>6/60 conns</span>
+        </div>
       </div>
     </div>
 
-    <div class="dashboard-grid">
-      <div class="table-card">
-        <div class="table-header"><h2>🏆 Top Productos</h2></div>
-        <table>
-          <thead><tr><th>Producto</th><th>Unidades</th><th>Ingresos</th></tr></thead>
-          <tbody id="top-productos-body">
-            <tr><td colspan="3"><div class="empty"><p>Sin datos aún</p></div></td></tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="table-card">
-        <div class="table-header"><h2>⭐ Mejores Clientes</h2></div>
-        <table>
-          <thead><tr><th>Cliente</th><th>Facturas</th><th>Total</th></tr></thead>
-          <tbody id="top-clientes-body">
-            <tr><td colspan="3"><div class="empty"><p>Sin datos aún</p></div></td></tr>
-          </tbody>
-        </table>
+    <div class="supabase-connections-block">
+      <div class="supabase-connections-header">Get connected</div>
+
+      <div class="supabase-connections-grid">
+        <div class="supabase-connect-card">
+          <div class="supabase-connect-icon">◌</div>
+          <div class="supabase-connect-title">Framework</div>
+          <div class="supabase-connect-desc">Use a client library</div>
+        </div>
+
+        <div class="supabase-connect-card">
+          <div class="supabase-connect-icon">▣</div>
+          <div class="supabase-connect-title">Server</div>
+          <div class="supabase-connect-desc">Build APIs</div>
+        </div>
+
+        <div class="supabase-connect-card">
+          <div class="supabase-connect-icon">◫</div>
+          <div class="supabase-connect-title">Direct</div>
+          <div class="supabase-connect-desc">Connection string</div>
+        </div>
+
+        <div class="supabase-connect-card">
+          <div class="supabase-connect-icon">⌾</div>
+          <div class="supabase-connect-title">ORM</div>
+          <div class="supabase-connect-desc">Third-party library</div>
+        </div>
+
+        <div class="supabase-connect-card">
+          <div class="supabase-connect-icon">⎇</div>
+          <div class="supabase-connect-title">MCP</div>
+          <div class="supabase-connect-desc">Connect your agent</div>
+        </div>
+
+        <div class="supabase-connect-card">
+          <div class="supabase-connect-icon">↗</div>
+          <div class="supabase-connect-title">API Keys</div>
+          <div class="supabase-connect-desc">Manage project keys</div>
+        </div>
       </div>
     </div>
 
-    <div class="table-card panel-spacing">
-      <div class="table-header"><h2>💳 Créditos pendientes</h2></div>
-      <table>
-        <thead><tr><th>Comprobante</th><th>Cliente</th><th>Vencimiento</th><th>Monto</th><th>Estado</th></tr></thead>
-        <tbody id="creditos-pendientes-body">
-          <tr><td colspan="5"><div class="empty"><p>Sin créditos pendientes</p></div></td></tr>
-        </tbody>
-      </table>
+    <div class="supabase-requests-bar">
+      <div class="supabase-requests-summary">
+        <span class="supabase-requests-icon">≡</span>
+        <span>11 Total Requests</span>
+        <strong>100.0% Success Rate</strong>
+      </div>
+      <button type="button">Last 60 minutes</button>
     </div>
   </div>
+</div>

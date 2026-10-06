@@ -1,14 +1,37 @@
 const express = require('express');
+const multer = require('multer');
+const fs = require('node:fs');
+const path = require('node:path');
+const crypto = require('node:crypto');
 const router = express.Router();
 const db = require('../database');
 const METODOS_COBRO = new Set(['efectivo', 'transferencia', 'tarjeta', 'otro', 'yape', 'bcp']);
 const { tienePermiso, requierePermiso } = require('../middleware/permisos');
+const { registrarAuditoria, sanitizarTexto } = require('../middleware/seguridad');
 const {
   ErrorValidacion,
   TIPOS,
   crearComprobante,
   cambiarEstadoComprobante,
 } = require('../services/comprobantes');
+
+const directorioEvidencias = path.resolve(__dirname, '..', 'uploads', 'comprobantes');
+fs.mkdirSync(directorioEvidencias, { recursive: true });
+const almacenamientoEvidencia = multer.diskStorage({
+  destination: directorioEvidencias,
+  filename: (_req, file, callback) => {
+    callback(null, `${Date.now()}-${crypto.randomUUID()}${path.extname(file.originalname || '.png').toLowerCase()}`);
+  },
+});
+const uploadEvidencia = multer({
+  storage: almacenamientoEvidencia,
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+  fileFilter: (_req, file, callback) => {
+    const permitidos = ['image/jpeg', 'image/png', 'image/webp'];
+    if (permitidos.includes(file.mimetype)) return callback(null, true);
+    callback(new Error('La evidencia debe ser una imagen JPG, PNG o WEBP con un máximo de 5 MB.'));
+  },
+});
 
 // ─── LISTAR ───────────────────────────────────────────────
 // GET /api/comprobantes?tipo=factura
@@ -150,14 +173,22 @@ router.post('/', (req, res) => {
   }
 });
 
-router.post('/:id/pagos', requierePermiso('comprobantes:pagar'), (req, res) => {
+router.post('/:id/pagos', requierePermiso('comprobantes:pagar'), uploadEvidencia.single('evidencia'), (req, res) => {
   const id = Number(req.params.id);
-  const monto = Number(req.body?.monto);
-  const fechaPago = req.body?.fecha_pago;
-  const metodoPago = String(req.body?.metodo_pago || '').trim().toLowerCase();
-  const referencia = String(req.body?.referencia || '').trim();
+  const rawBody = req.body || {};
+  const monto = Number(rawBody?.monto);
+  const fechaPago = rawBody?.fecha_pago;
+  const metodoPago = String(rawBody?.metodo_pago || '').trim().toLowerCase();
+  const referencia = sanitizarTexto(String(rawBody?.referencia || '').trim(), 100);
+  const evidenciasPermitidas = ['image/jpeg', 'image/png', 'image/webp'];
+  const evidencia = req.file;
   const centavos = Math.round(monto * 100);
   const fecha = typeof fechaPago === 'string' ? new Date(`${fechaPago}T00:00:00.000Z`) : null;
+
+  if (evidencia && !evidenciasPermitidas.includes(evidencia.mimetype)) {
+    return res.status(400).json({ ok: false, error: 'La evidencia debe ser una imagen JPG, PNG o WEBP.' });
+  }
+
   if (!Number.isInteger(id) || id <= 0 || !Number.isFinite(monto) || monto <= 0 ||
       Math.abs(monto * 100 - centavos) > 1e-7 || !fecha || !/^\d{4}-\d{2}-\d{2}$/.test(fechaPago) ||
       !Number.isFinite(fecha.getTime()) || fecha.toISOString().slice(0, 10) !== fechaPago ||
@@ -203,6 +234,18 @@ router.post('/:id/pagos', requierePermiso('comprobantes:pagar'), (req, res) => {
         WHERE id = ? AND estado = ?
       `).run(estado, fechaPago, id, comprobante.estado);
       if (actualizacion.changes !== 1) throw new Error('El estado del comprobante cambió durante el cobro.');
+
+      registrarAuditoria({
+        req,
+        accion: 'cobro_registrado',
+        detalle: {
+          comprobanteId: id,
+          metodoPago,
+          monto,
+          referencia: referencia || null,
+          evidencia: evidencia ? evidencia.filename : null,
+        },
+      });
 
       return {
         comprobante_id: id,

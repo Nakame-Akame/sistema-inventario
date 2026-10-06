@@ -16,6 +16,9 @@ const PERMISOS_POR_ROL = Object.freeze({
 });
 
 const GRUPOS_PERMISOS = Object.freeze([
+	{ grupo: 'Usuarios', permisos: [
+		{ id: 'usuarios:administrar', nombre: 'Administrar usuarios' },
+	] },
 	{ grupo: 'Clientes', permisos: [
 		{ id: 'clientes:ver', nombre: 'Ver clientes' },
 		{ id: 'clientes:crear', nombre: 'Crear clientes' },

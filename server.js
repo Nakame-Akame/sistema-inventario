@@ -5,6 +5,7 @@ const session  = require('express-session');
 const helmet   = require('helmet');
 const { rateLimit } = require('express-rate-limit');
 const path = require('node:path');
+const { validarBodyObject } = require('./middleware/seguridad');
 
 const sessionSecret = process.env.SESSION_SECRET;
 if (!sessionSecret) {
@@ -15,6 +16,7 @@ const db = require('./database');
 
 const app  = express();
 const PORT = Number(process.env.PORT || 3000);
+app.disable('x-powered-by');
 const corsOrigins = (process.env.CORS_ORIGIN || '')
   .split(',')
   .map(origin => origin.trim())
@@ -22,13 +24,15 @@ const corsOrigins = (process.env.CORS_ORIGIN || '')
 
 if (corsOrigins.length) app.use(cors({ origin: corsOrigins, credentials: true }));
 app.use(helmet({ contentSecurityPolicy: false }));
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+app.use(validarBodyObject);
 app.use(session({
   secret: sessionSecret,
   resave: false,
   saveUninitialized: false,
   cookie: {
-    maxAge: 8 * 60 * 60 * 1000,
+    maxAge: 60 * 60 * 1000,
     httpOnly: true,
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',

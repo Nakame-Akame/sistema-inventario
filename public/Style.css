@@ -137,6 +137,316 @@ button { -webkit-tap-highlight-color: transparent; }
 
 .page { padding: 28px 34px 42px; }
 .page.active { animation: page-arrive 0.35s ease both; }
+.supabase-dashboard {
+	display: grid;
+	gap: 24px;
+	padding: 10px 0 0;
+}
+.supabase-platform-shell {
+	display: grid;
+	grid-template-columns: minmax(0, 1.55fr) minmax(300px, 0.9fr);
+	gap: 18px;
+	min-height: 430px;
+	padding: 18px 20px 0;
+}
+.supabase-main-panel,
+.supabase-side-panel,
+.supabase-connect-card,
+.supabase-stat-card,
+.supabase-requests-bar {
+	border: 1px solid #e2e6df;
+	border-radius: 14px;
+	background: rgba(255,255,255,0.54);
+	box-shadow: 0 10px 26px rgba(20, 43, 31, 0.04);
+}
+.supabase-main-panel {
+	padding: 18px 18px 14px;
+}
+.supabase-header {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	margin-bottom: 22px;
+}
+.supabase-header h1 {
+	margin: 0;
+	color: #1f2c28;
+	font-size: clamp(30px, 3vw, 40px);
+	line-height: 1.1;
+	font-weight: 600;
+	letter-spacing: -0.04em;
+}
+.chip-link {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	width: fit-content;
+	padding: 7px 12px;
+	border: 1px solid #dde7dc;
+	border-radius: 8px;
+	background: rgba(248, 250, 246, 0.9);
+	color: #536b5a;
+	font-size: 12px;
+}
+.chip-link button {
+	border: 1px solid #d8e3d5;
+	background: #f8faf7;
+	color: #486154;
+	border-radius: 6px;
+	padding: 4px 8px;
+	font-size: 11px;
+	cursor: pointer;
+}
+.supabase-grid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 14px;
+	min-height: 250px;
+}
+.supabase-stat-card {
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	min-height: 110px;
+	padding: 16px 18px;
+	background: linear-gradient(180deg, rgba(251,251,251,0.8), rgba(247,249,245,0.9));
+}
+.supabase-card-label {
+	color: #737f77;
+	font-size: 10px;
+	font-weight: 700;
+	letter-spacing: 1.1px;
+	margin-bottom: 12px;
+}
+.supabase-status-row {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 20px;
+	font-weight: 600;
+	color: #1d201d;
+}
+.supabase-status-dot {
+	width: 10px;
+	height: 10px;
+	border-radius: 50%;
+	background: #5bc38b;
+	box-shadow: 0 0 0 4px rgba(91, 195, 139, 0.16);
+}
+.supabase-chip {
+	display: inline-flex;
+	width: fit-content;
+	padding: 5px 9px;
+	border-radius: 7px;
+	background: rgba(91, 195, 139, 0.12);
+	color: #2b7a53;
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.05em;
+}
+.supabase-mini-link,
+.supabase-muted {
+	color: #5b665e;
+	font-size: 13px;
+	line-height: 1.5;
+}
+.supabase-side-panel {
+	position: relative;
+	padding: 14px 16px 14px;
+	background: linear-gradient(180deg, rgba(244,246,242,0.9), rgba(239,243,237,0.84));
+	overflow: hidden;
+}
+.supabase-side-panel::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background-image: radial-gradient(#dfe8df 1.3px, transparent 1.3px);
+	background-size: 12px 12px;
+	opacity: 0.7;
+	pointer-events: none;
+}
+.supabase-side-tools,
+.supabase-db-card,
+.supabase-metrics-row {
+	position: relative;
+	z-index: 1;
+}
+.supabase-side-tools {
+	display: flex;
+	justify-content: flex-end;
+	gap: 6px;
+	margin-bottom: 110px;
+}
+.supabase-side-tools button {
+	width: 26px;
+	height: 26px;
+	border: 1px solid #dfe7df;
+	border-radius: 6px;
+	background: rgba(255,255,255,0.6);
+	color: #4b5c50;
+	cursor: pointer;
+}
+.supabase-db-card {
+	margin: 0 auto 18px;
+	width: min(100%, 270px);
+	padding: 14px 14px 10px;
+	border: 1px solid #dfe5dc;
+	border-radius: 10px;
+	background: rgba(255,255,255,0.9);
+}
+.supabase-db-badge {
+	margin-bottom: 10px;
+	font-size: 11px;
+	font-weight: 600;
+	color: #4d5f51;
+}
+.supabase-db-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	color: #1f2c28;
+	font-weight: 600;
+}
+.supabase-db-icon {
+	display: inline-grid;
+	place-items: center;
+	width: 20px;
+	height: 20px;
+	border-radius: 6px;
+	background: rgba(91, 195, 139, 0.12);
+	color: #1b6d46;
+	font-size: 11px;
+}
+.supabase-db-name {
+	flex: 1;
+	font-size: 12px;
+}
+.supabase-db-flag {
+	font-size: 14px;
+}
+.supabase-db-meta {
+	margin-top: 8px;
+	color: #7b837d;
+	font-size: 11px;
+}
+.supabase-metrics-row {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: 10px 16px;
+	color: #5f6f62;
+	font-size: 11px;
+}
+.supabase-connections-block {
+	padding: 0 18px;
+}
+.supabase-connections-header {
+	margin: 10px 0 18px;
+	color: #1d2a27;
+	font-size: 20px;
+	font-weight: 700;
+	letter-spacing: -0.03em;
+}
+.supabase-connections-grid {
+	display: grid;
+	grid-template-columns: repeat(6, minmax(0, 1fr));
+	gap: 12px;
+}
+.supabase-connect-card {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	min-height: 128px;
+	padding: 16px 12px;
+	text-align: center;
+	background: rgba(255,255,255,0.48);
+}
+.supabase-connect-icon {
+	display: grid;
+	place-items: center;
+	width: 30px;
+	height: 30px;
+	margin-bottom: 12px;
+	border-radius: 7px;
+	background: rgba(219, 231, 221, 0.9);
+	color: #3d4b43;
+	font-size: 18px;
+}
+.supabase-connect-title {
+	color: #1f2d2a;
+	font-size: 15px;
+	font-weight: 600;
+	margin-bottom: 4px;
+}
+.supabase-connect-desc {
+	color: #7a857d;
+	font-size: 11px;
+	line-height: 1.4;
+}
+.supabase-requests-bar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	margin: 0 18px 18px;
+	padding: 12px 14px;
+	background: rgba(255,255,255,0.72);
+}
+.supabase-requests-summary {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	color: #2f3d35;
+	font-size: 12px;
+	font-weight: 700;
+}
+.supabase-requests-summary strong {
+	color: #324138;
+	font-weight: 800;
+}
+.supabase-requests-icon {
+	color: #6b7a6f;
+	font-size: 14px;
+}
+.supabase-requests-bar button {
+	border: 1px solid #dfe7df;
+	border-radius: 8px;
+	background: rgba(247,249,245,0.85);
+	color: #405148;
+	padding: 7px 12px;
+	font-size: 11px;
+	cursor: pointer;
+}
+.hidden-metric {
+	display: none !important;
+}
+
+@media (max-width: 1180px) {
+	.supabase-platform-shell {
+		grid-template-columns: 1fr;
+	}
+	.supabase-connections-grid {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+}
+
+@media (max-width: 700px) {
+	.supabase-grid {
+		grid-template-columns: 1fr;
+	}
+	.supabase-connections-grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+	.supabase-platform-shell {
+		padding: 14px 10px 0;
+	}
+	.supabase-connections-block,
+	.supabase-requests-bar {
+		padding-left: 10px;
+		padding-right: 10px;
+	}
+}
 .page-intro {
 	display: flex;
 	align-items: flex-end;

@@ -1,5 +1,10 @@
 const API = '/api';
 
+function setTextIfExists(id, value) {
+  const element = document.getElementById(id);
+  if (element) element.textContent = value;
+}
+
 // Helper: todas las llamadas a la API deben enviar la cookie de sesión
 function apiFetch(url, options = {}) {
   return fetch(url, { ...options, credentials: 'include' });
@@ -62,13 +67,13 @@ async function cargarDashboard() {
     const d = await r.json();
     if (!d.ok) return;
     const { ventas_hoy, ventas_mes, clientes, productos, facturas, productos_stock_bajo, por_cobrar_credito } = d.data;
-    document.getElementById('stat-hoy').textContent = 'S/ ' + ventas_hoy.toFixed(2);
-    document.getElementById('stat-mes').textContent = 'S/ ' + ventas_mes.toFixed(2);
-    document.getElementById('stat-clientes').textContent = clientes;
-    document.getElementById('stat-productos').textContent = productos;
-    document.getElementById('stat-facturas').textContent = facturas;
-    document.getElementById('stat-stock').textContent = productos_stock_bajo;
-    document.getElementById('stat-por-cobrar').textContent = 'S/ ' + (por_cobrar_credito || 0).toFixed(2);
+    setTextIfExists('stat-hoy', 'S/ ' + ventas_hoy.toFixed(2));
+    setTextIfExists('stat-mes', 'S/ ' + ventas_mes.toFixed(2));
+    setTextIfExists('stat-clientes', String(clientes));
+    setTextIfExists('stat-productos', String(productos));
+    setTextIfExists('stat-facturas', String(facturas));
+    setTextIfExists('stat-stock', String(productos_stock_bajo));
+    setTextIfExists('stat-por-cobrar', 'S/ ' + (por_cobrar_credito || 0).toFixed(2));
 
     const rTop = await apiFetch(`${API}/reportes/productos-mas-vendidos`);
     const dTop = await rTop.json();
@@ -104,10 +109,12 @@ async function cargarDashboard() {
     const tCred = document.getElementById('creditos-pendientes-body');
     if (!dCred.ok || dCred.data.length === 0) {
       tCred.innerHTML = '<tr><td colspan="5"><div class="empty"><p>Sin créditos pendientes</p></div></td></tr>';
-      document.getElementById('stat-por-cobrar-sub').textContent = 'pendiente';
+      const porCobrarSub = document.getElementById('stat-por-cobrar-sub');
+      if (porCobrarSub) porCobrarSub.textContent = 'pendiente';
     } else {
       const vencidos = dCred.data.filter(c => c.vencido).length;
-      document.getElementById('stat-por-cobrar-sub').textContent = vencidos > 0 ? `${vencidos} vencido(s)` : 'pendiente';
+      const porCobrarSub = document.getElementById('stat-por-cobrar-sub');
+      if (porCobrarSub) porCobrarSub.textContent = vencidos > 0 ? `${vencidos} vencido(s)` : 'pendiente';
       tCred.innerHTML = dCred.data.map(c => {
         const cfg = TIPOS_COMPROBANTE[c.tipo] || { label: c.tipo };
         const num = `${c.serie}-${String(c.numero).padStart(6,'0')}`;

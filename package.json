@@ -6,6 +6,7 @@
   "scripts": {
     "admin:create": "node scripts/create-admin.js",
     "db:backup": "node scripts/backup.js",
+    "db:migrate:supabase": "node scripts/migrate-sqlite-to-supabase.js",
     "db:restore": "node scripts/restore.js",
     "start": "node server.js",
     "test": "node --test",
@@ -25,8 +26,9 @@
   "homepage": "https://github.com/Nakame-Akame/sistema-facturacion#readme",
   "dependencies": {
     "@sparticuz/chromium": "^149.0.0",
+    "@supabase/supabase-js": "^2.117.2",
     "bcryptjs": "^3.0.3",
-    "better-sqlite3": "^12.10.1",
+    "better-sqlite3": "^13.0.3",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
@@ -34,6 +36,7 @@
     "express-session": "^1.19.0",
     "helmet": "^8.3.0",
     "multer": "^2.4.0",
+    "pg": "^8.23.1",
     "puppeteer-core": "^25.1.0",
     "xlsx": "^0.18.5"
   },
