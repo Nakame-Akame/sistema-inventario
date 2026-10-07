@@ -719,6 +719,12 @@ module.exports = {
   TIPOS,
   aCentimos,
   desdeCentimos,
+  validarCentimos,
+  unidadesCantidad,
+  importePorCantidad,
+  prorratearCentimos,
+  validarSolicitud,
+  aplicarLimitesAjuste,
   crearComprobante,
   cambiarEstadoComprobante,
 };

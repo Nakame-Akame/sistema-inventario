@@ -68,11 +68,16 @@ router.post('/', requierePermiso('clientes:crear'), async (req, res) => {
 router.put('/:id', requierePermiso('clientes:editar'), async (req, res) => {
   try {
     const { nombre, documento, direccion, email, telefono } = req.body;
+    const tipoDocumento = req.body.tipo_documento || 'DNI';
+    if (!['DNI', 'RUC', 'CE'].includes(tipoDocumento)) {
+      return res.status(400).json({ ok: false, error: 'Tipo de documento inválido' });
+    }
     const result = await db.query(`
       UPDATE clientes
-      SET nombre = $1, documento = $2, direccion = $3, email = $4, telefono = $5
-      WHERE id = $6
-    `, [nombre, documento, direccion, email, telefono, req.params.id]);
+      SET nombre = $1, documento = $2, tipo_documento = $3,
+        direccion = $4, email = $5, telefono = $6
+      WHERE id = $7
+    `, [nombre, documento, tipoDocumento, direccion, email, telefono, req.params.id]);
     if (!result.rowCount) return res.status(404).json({ ok: false, error: 'Cliente no encontrado' });
     res.json({ ok: true, mensaje: 'Cliente actualizado' });
   } catch {

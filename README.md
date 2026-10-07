@@ -12,7 +12,7 @@ npm install
 Copy-Item .env.example .env
 ```
 
-Si npm 11 informa que el script de instalación de `better-sqlite3` está pendiente de aprobación, revisa y autoriza ese paquete con `npm approve-scripts better-sqlite3` y ejecuta `npm rebuild better-sqlite3`. Es el binding nativo que necesita SQLite; no apruebes scripts de otros paquetes sin revisarlos.
+SQLite se conserva para importar o recuperar la base local. Si npm 11 informa que el script de instalación de `better-sqlite3` está pendiente de aprobación, revisa y autoriza ese paquete con `npm approve-scripts better-sqlite3` y ejecuta `npm rebuild better-sqlite3`.
 
 Genera un secreto de sesión y colócalo en `SESSION_SECRET` dentro de `.env`:
 
@@ -24,21 +24,29 @@ El servidor se niega a iniciar si `SESSION_SECRET` está vacío.
 
 ## Migrar datos SQLite a Supabase
 
-La migración conserva el archivo SQLite original. Copia la cadena PostgreSQL del proyecto desde Supabase (Database > Connect) a `SUPABASE_DB_URL` en `.env`. Esta variable debe contener la cadena de conexión de la base de datos, no una clave `anon` o `service_role`, y debe mantenerse privada.
+La aplicación usa PostgreSQL de Supabase por defecto. La importación conserva el archivo SQLite original. Copia la cadena PostgreSQL del proyecto desde Supabase (Database > Connect) a `SUPABASE_DB_URL` en `.env`. Esta variable debe contener la cadena de conexión de la base de datos, no una clave `anon` o `service_role`, y debe mantenerse privada.
 
-Aplica `supabase/schema.sql` en el SQL Editor de Supabase. Luego revisa cuántos registros se importarían, sin escribir en Supabase:
+Aplica `supabase/schema.sql` en el SQL Editor de Supabase antes de iniciar el servidor o importar. Revisa cuántos registros se importarían; este comando solo lee el archivo SQLite y no se conecta a Supabase:
 
 ```powershell
 npm run db:migrate:supabase
 ```
 
-Cuando la vista previa sea correcta y el destino esté vacío, ejecuta la importación transaccional:
+Si Supabase ya tiene datos, compara ambos lados antes de decidir qué hacer. El comando siguiente es de solo lectura, no muestra los valores de los registros y resume conteos, claves coincidentes y columnas diferentes:
+
+```powershell
+npm run db:compare:supabase
+```
+
+La importación inserta los datos solo si todas las tablas de destino están vacías. Si ya existen todas las filas SQLite y coinciden por identificador y contenido, el comando detecta que la importación está completa y termina sin escribir; conserva cualquier fila adicional que solo exista en Supabase. Si encuentra filas faltantes o diferentes, se detiene sin mezclarlas ni sobrescribirlas. No borres datos para hacer pasar esta protección.
+
+Cuando el destino esté vacío, ejecuta la importación transaccional:
 
 ```powershell
 npm run db:migrate:supabase -- --apply
 ```
 
-El importador se niega a combinar datos si encuentra registros en cualquiera de las tablas de destino. La aplicación aún usa la capa SQLite; la importación por sí sola no cambia la conexión del servidor. La conversión de rutas y transacciones a PostgreSQL debe completarse antes de apuntar la aplicación a Supabase.
+El importador se niega a combinar datos si encuentra registros en cualquiera de las tablas de destino. Cuando termine, inicia el servidor con `DATABASE_BACKEND=postgres` (el valor predeterminado) y `SUPABASE_DB_URL` configurado. Para volver temporalmente a SQLite, define explícitamente `DATABASE_BACKEND=sqlite`.
 
 Configura los valores de `.env` según el entorno:
 
@@ -47,8 +55,9 @@ Configura los valores de `.env` según el entorno:
 | `PORT` | Puerto HTTP | `3000` |
 | `NODE_ENV` | Entorno de ejecución | `development` |
 | `SESSION_SECRET` | Firma de cookies de sesión; obligatorio | Sin valor |
-| `DB_PATH` | Archivo SQLite; puede ser una ruta absoluta o relativa al proyecto | `facturacion.db` |
-| `SUPABASE_DB_URL` | Conexión PostgreSQL de Supabase; solo la usa el importador | Sin valor |
+| `DATABASE_BACKEND` | Base usada por la aplicación (`postgres` o `sqlite`) | `postgres` |
+| `DB_PATH` | Archivo SQLite de origen para la importación o el modo SQLite | `facturacion.db` |
+| `SUPABASE_DB_URL` | Cadena privada de conexión PostgreSQL usada por la aplicación y el importador | Sin valor |
 | `LOGIN_RATE_LIMIT` | Intentos de login por ventana | `5` |
 | `BACKUP_DIR` | Directorio para respaldos; puede ser absoluto o relativo al proyecto | `backups` |
 | `CORS_ORIGIN` | Orígenes externos autorizados separados por coma; déjalo vacío para mismo origen | Vacío |
@@ -75,7 +84,7 @@ El comando solicita nombre, correo y contraseña (mínimo 12 caracteres), y alma
 npm start
 ```
 
-El servidor queda disponible en `http://localhost:3000` (o en el puerto definido por `PORT`). La ruta `GET /api/health` comprueba también que SQLite responde. El frontend usa una ruta relativa `/api`, así que no requiere cambiar código al desplegarlo detrás de otro host o puerto.
+El servidor queda disponible en `http://localhost:3000` (o en el puerto definido por `PORT`). Al usar PostgreSQL, inicializa las series predeterminadas y `GET /api/health` verifica la conexión. El frontend usa una ruta relativa `/api`, así que no requiere cambiar código al desplegarlo detrás de otro host o puerto.
 
 ### Estructura del frontend
 
@@ -106,7 +115,7 @@ Las pruebas usan SQLite en memoria y no escriben en `facturacion.db`. El chequeo
 - Para líneas de producto, el precio siempre sale del catálogo; cualquier precio enviado por el navegador se ignora. Las guías pueden llevar una descripción libre sin precio.
 - Importes y descuentos se normalizan a centavos con redondeo decimal. El descuento por línea no puede exceder su precio y el descuento general no puede exceder el subtotal.
 - Devoluciones y notas de crédito requieren un comprobante de venta del mismo cliente y no pueden ajustar más unidades que las aún disponibles.
-- Emisión, reserva de serie, movimientos de stock, anulación y devolución usan transacciones SQLite. No se permite stock negativo; las anulaciones repetidas o transiciones de estado no autorizadas se rechazan.
+- Emisión, reserva de serie, cobros, recepción de compras, movimientos de stock, anulación y devolución usan transacciones en la base configurada. PostgreSQL bloquea las filas involucradas para evitar consumir stock o números de serie concurrentemente. No se permite stock negativo; las anulaciones repetidas o transiciones de estado no autorizadas se rechazan.
 
 ## Inventario y kardex
 
@@ -144,6 +153,10 @@ El administrador puede crear cuentas desde la sección Usuarios y asignar los ro
 
 ## Respaldar y restaurar
 
+En modo PostgreSQL, configura y verifica los respaldos administrados por Supabase (incluida la retención/PITR disponible en tu plan) y ensaya la restauración antes de producción. `npm run db:backup` y `npm run db:restore` operan únicamente sobre archivos SQLite; no respaldan ni restauran la base Supabase. Conserva aparte una copia inmutable del archivo SQLite original hasta validar el corte.
+
+Para el modo SQLite o la base de origen:
+
 ```powershell
 npm run db:backup
 npm run db:restore -- .\backups\facturacion-<fecha>.db
@@ -153,7 +166,7 @@ El respaldo se verifica con `quick_check`. Las rutas relativas de `DB_PATH` y `B
 
 ### Programar respaldos
 
-Programa `npm run db:backup` diariamente con el usuario del sistema operativo que tenga acceso al proyecto y a `.env`. Por ejemplo, en Windows PowerShell, desde la carpeta del proyecto:
+Programa `npm run db:backup` diariamente solo si estás usando SQLite o si quieres respaldar la base SQLite de origen. Para PostgreSQL, usa las herramientas de respaldo de Supabase. Por ejemplo, en Windows PowerShell, desde la carpeta del proyecto:
 
 ```powershell
 $project = (Get-Location).Path
@@ -173,12 +186,13 @@ Comprueba periódicamente el historial/resultado de la tarea y conserva copias f
 ## Despliegue y operación
 
 1. Instala Node.js y npm; clona o extrae el proyecto en una carpeta persistente.
-2. Ejecuta `npm install`, crea `.env` desde `.env.example`, establece `SESSION_SECRET` y define `DB_PATH`/`BACKUP_DIR` si no usarás las rutas locales predeterminadas.
-3. Ejecuta `npm run admin:create` una sola vez para crear el administrador inicial. No incluyas la contraseña en comandos o logs.
-4. Ejecuta `npm test` y luego `npm start`. En despliegues permanentes, ejecuta Node con un supervisor de procesos del sistema operativo y configura proxy HTTPS; no expongas la app directamente a Internet sin TLS.
-5. Programa y verifica los respaldos. Antes de actualizar, crea un respaldo, detén el proceso, actualiza dependencias con `npm install`, ejecuta pruebas y vuelve a iniciar.
+2. Ejecuta `npm install`, crea `.env` desde `.env.example`, establece `SESSION_SECRET` y `SUPABASE_DB_URL`. Aplica `supabase/schema.sql` en Supabase antes de iniciar la aplicación.
+3. Ejecuta `npm run db:migrate:supabase` para revisar conteos. Tras verificar que el destino está vacío, ejecuta `npm run db:migrate:supabase -- --apply` una sola vez para importar los datos.
+4. Ejecuta `npm run admin:create` solo si necesitas crear o restablecer el administrador después de la importación. No incluyas la contraseña en comandos o logs.
+5. Ejecuta `npm test` y luego `npm start`. En despliegues permanentes, ejecuta Node con un supervisor de procesos del sistema operativo y configura proxy HTTPS; no expongas la app directamente a Internet sin TLS.
+6. Configura y verifica los respaldos de Supabase. Antes de actualizar, verifica que exista un respaldo restaurable, detén el proceso, actualiza dependencias con `npm install`, ejecuta pruebas y vuelve a iniciar.
 
-Los errores no controlados de API producen JSON uniforme para el cliente y una línea JSON con nivel, fecha, método, ruta, estado y tipo de error en el log del proceso. No se registran cuerpos de solicitudes ni mensajes que puedan incluir datos sensibles. `GET /api/health` devuelve `503` si SQLite no responde.
+Los errores no controlados de API producen JSON uniforme para el cliente y una línea JSON con nivel, fecha, método, ruta, estado y tipo de error en el log del proceso. No se registran cuerpos de solicitudes ni mensajes que puedan incluir datos sensibles. `GET /api/health` devuelve `503` si la base configurada no responde.
 
 ### Consulta de DNI y RUC
 
@@ -189,10 +203,6 @@ El selector de clientes puede consultar DNI en RENIEC y RUC en SUNAT por medio d
 La conexión real de producción no está habilitada. SUNAT documenta dos entornos de prueba. Beta usa el endpoint beta y credenciales de prueba (`RUC+MODDATOS` / `MODDATOS`), sin requerir certificado digital registrado. Homologación SQA usa el endpoint `https://ww1.sunat.gob.pe/ol-ti-itcpgem-sqa/billService` y credenciales SOL secundarias autorizadas para el perfil de envío. La contraseña SOL no debe usarse en Beta ni compartirse por chat. La configuración solo acepta `SUNAT_MODE=disabled`, `beta` u `homologation`, fija los endpoints HTTPS y rechaza ambos modos si `NODE_ENV=production`.
 
 Para Beta configura `SUNAT_MODE=beta` y `SUNAT_RUC`. Para homologación configura `SUNAT_MODE=homologation`, `SUNAT_RUC`, `SUNAT_SOL_USER` y `SUNAT_SOL_PASSWORD` solo en `.env` local, y verifica con SUNAT el usuario secundario/perfil habilitado. No coloques credenciales en comandos, logs ni el repositorio. La Clave SOL autentica la llamada SOAP; la firma XMLDSig requiere aparte el certificado digital registrado del emisor. La configuración no envía comprobantes todavía; el XML, firma, envío y ciclo CDR deben completarse y probarse antes de considerar terminada la fase 4. La arquitectura final elegida sigue siendo un PSE autorizado, cuya API y credenciales sandbox deben definirse antes del despliegue.
-
-### Criterios para evaluar PostgreSQL
-
-No se migra la base de datos en esta fase. Reevalúa SQLite cuando se observen bloqueos de escritura frecuentes bajo concurrencia real, varios procesos/instancias escribiendo a la vez, crecimiento de usuarios simultáneos que afecte latencia o requisitos de alta disponibilidad/operación centralizada. Antes de aprobar una migración: medir esos indicadores, diseñar mapeo de esquema y tipos, ensayar exportación/importación en una copia, comparar conteos e importes, preparar periodo de solo lectura/corte, plan de reversión y respaldo restaurable. No ejecutar la migración hasta aprobar el plan y validar una prueba integral.
 
 ## Datos sensibles en Git
 

@@ -1,10 +1,5 @@
 const API = '/api';
 
-function setTextIfExists(id, value) {
-  const element = document.getElementById(id);
-  if (element) element.textContent = value;
-}
-
 // Helper: todas las llamadas a la API deben enviar la cookie de sesión
 function apiFetch(url, options = {}) {
   return fetch(url, { ...options, credentials: 'include' });
@@ -67,13 +62,13 @@ async function cargarDashboard() {
     const d = await r.json();
     if (!d.ok) return;
     const { ventas_hoy, ventas_mes, clientes, productos, facturas, productos_stock_bajo, por_cobrar_credito } = d.data;
-    setTextIfExists('stat-hoy', 'S/ ' + ventas_hoy.toFixed(2));
-    setTextIfExists('stat-mes', 'S/ ' + ventas_mes.toFixed(2));
-    setTextIfExists('stat-clientes', String(clientes));
-    setTextIfExists('stat-productos', String(productos));
-    setTextIfExists('stat-facturas', String(facturas));
-    setTextIfExists('stat-stock', String(productos_stock_bajo));
-    setTextIfExists('stat-por-cobrar', 'S/ ' + (por_cobrar_credito || 0).toFixed(2));
+    document.getElementById('stat-hoy').textContent = 'S/ ' + ventas_hoy.toFixed(2);
+    document.getElementById('stat-mes').textContent = 'S/ ' + ventas_mes.toFixed(2);
+    document.getElementById('stat-clientes').textContent = clientes;
+    document.getElementById('stat-productos').textContent = productos;
+    document.getElementById('stat-facturas').textContent = facturas;
+    document.getElementById('stat-stock').textContent = productos_stock_bajo;
+    document.getElementById('stat-por-cobrar').textContent = 'S/ ' + (por_cobrar_credito || 0).toFixed(2);
 
     const rTop = await apiFetch(`${API}/reportes/productos-mas-vendidos`);
     const dTop = await rTop.json();
@@ -97,7 +92,7 @@ async function cargarDashboard() {
     } else {
       tcli.innerHTML = dCli.data.map(c => `
         <tr>
-          <td>${escaparHTML(c.nombre)}</td>
+          <td>${c.nombre}</td>
           <td><span class="badge badge-green">${c.total_facturas}</span></td>
           <td class="mono">S/ ${c.total_compras.toFixed(2)}</td>
         </tr>`).join('');
@@ -109,19 +104,17 @@ async function cargarDashboard() {
     const tCred = document.getElementById('creditos-pendientes-body');
     if (!dCred.ok || dCred.data.length === 0) {
       tCred.innerHTML = '<tr><td colspan="5"><div class="empty"><p>Sin créditos pendientes</p></div></td></tr>';
-      const porCobrarSub = document.getElementById('stat-por-cobrar-sub');
-      if (porCobrarSub) porCobrarSub.textContent = 'pendiente';
+      document.getElementById('stat-por-cobrar-sub').textContent = 'pendiente';
     } else {
       const vencidos = dCred.data.filter(c => c.vencido).length;
-      const porCobrarSub = document.getElementById('stat-por-cobrar-sub');
-      if (porCobrarSub) porCobrarSub.textContent = vencidos > 0 ? `${vencidos} vencido(s)` : 'pendiente';
+      document.getElementById('stat-por-cobrar-sub').textContent = vencidos > 0 ? `${vencidos} vencido(s)` : 'pendiente';
       tCred.innerHTML = dCred.data.map(c => {
         const cfg = TIPOS_COMPROBANTE[c.tipo] || { label: c.tipo };
         const num = `${c.serie}-${String(c.numero).padStart(6,'0')}`;
         const fechaVto = c.fecha_vencimiento ? new Date(c.fecha_vencimiento).toLocaleDateString('es-PE') : '—';
         return `<tr>
           <td><span class="mono">${num}</span><br><small style="color:var(--muted)">${cfg.label}</small></td>
-          <td>${escaparHTML(c.cliente_nombre)}</td>
+          <td>${c.cliente_nombre}</td>
           <td>${fechaVto}</td>
           <td class="mono">S/ ${c.total.toFixed(2)}</td>
           <td>${c.vencido ? '<span class="badge badge-red">⚠️ Vencido</span>' : '<span class="badge badge-yellow">Pendiente</span>'}</td>
@@ -141,59 +134,23 @@ async function cargarClientes() {
 
 function renderClientes(lista) {
   const tbody = document.getElementById('clientes-body');
-  tbody.replaceChildren();
   if (lista.length === 0) {
-    const fila = document.createElement('tr');
-    const celda = document.createElement('td');
-    celda.colSpan = 5;
-    const vacio = document.createElement('div');
-    vacio.className = 'empty';
-    const icono = document.createElement('span');
-    icono.className = 'icon';
-    icono.textContent = '👥';
-    const mensaje = document.createElement('p');
-    mensaje.textContent = 'No hay clientes aún';
-    vacio.append(icono, mensaje);
-    celda.append(vacio);
-    fila.append(celda);
-    tbody.append(fila);
+    tbody.innerHTML = '<tr><td colspan="5"><div class="empty"><span class="icon">👥</span><p>No hay clientes aún</p></div></td></tr>';
     return;
   }
-  lista.forEach(cliente => {
-    const fila = document.createElement('tr');
-    const nombre = document.createElement('strong');
-    nombre.textContent = cliente.nombre ?? '';
-    const nombreCelda = document.createElement('td');
-    nombreCelda.append(nombre);
-
-    const documento = document.createElement('td');
-    documento.className = 'mono';
-    documento.textContent = cliente.documento || '—';
-
-    const email = document.createElement('td');
-    email.textContent = cliente.email || '—';
-
-    const telefono = document.createElement('td');
-    telefono.textContent = cliente.telefono || '—';
-
-    const accionesCelda = document.createElement('td');
-    const acciones = document.createElement('div');
-    acciones.className = 'actions-group';
-    const editar = document.createElement('button');
-    editar.type = 'button';
-    editar.className = 'btn btn-ghost btn-sm';
-    editar.textContent = '✏️ Editar';
-    editar.addEventListener('click', () => editarCliente(cliente.id));
-    const eliminar = document.createElement('button');
-    eliminar.type = 'button';
-    eliminar.className = 'btn btn-danger btn-sm';
-    eliminar.textContent = '🗑️';
-    eliminar.addEventListener('click', () => eliminarCliente(cliente.id, cliente.nombre));
-    acciones.append(editar, eliminar);
-    accionesCelda.append(acciones);
-    fila.append(nombreCelda, documento, email, telefono, accionesCelda);
-    tbody.append(fila);
-  });
+  tbody.innerHTML = lista.map(c => `
+    <tr>
+      <td><strong>${c.nombre}</strong></td>
+      <td class="mono">${c.documento || '—'}</td>
+      <td>${c.email || '—'}</td>
+      <td>${c.telefono || '—'}</td>
+      <td>
+        <div class="actions-group">
+          <button class="btn btn-ghost btn-sm" onclick="editarCliente(${c.id})">✏️ Editar</button>
+          <button class="btn btn-danger btn-sm" onclick="eliminarCliente(${c.id}, '${c.nombre}')">🗑️</button>
+        </div>
+      </td>
+    </tr>`).join('');
 }
 
 function filtrarClientes() {
@@ -1169,7 +1126,7 @@ function renderFacturas(lista) {
         <span class="mono">${num}</span><br>
         <small style="color:${cfg.color}">${cfg.label}</small>
       </td>
-      <td><strong>${escaparHTML(f.cliente_nombre)}</strong><br><small style="color:var(--muted)">${escaparHTML(f.cliente_documento || '')}</small></td>
+      <td><strong>${f.cliente_nombre}</strong><br><small style="color:var(--muted)">${f.cliente_documento||''}</small></td>
       <td>${fecha}</td>
       <td>
         <span class="badge ${f.condicion_pago === 'credito' ? (credVencido ? 'badge-red' : 'badge-yellow') : f.condicion_pago === 'contado' ? 'badge-green' : 'badge-blue'}">
@@ -1429,7 +1386,7 @@ async function abrirModalFactura(tipoPreseleccionado) {
     selRef.innerHTML = '<option value="">-- Selecciona comprobante --</option>';
     (d.data || []).filter(c => c.estado !== 'anulado').forEach(c => {
       const num = `${c.serie}-${String(c.numero).padStart(6,'0')}`;
-      selRef.innerHTML += `<option value="${c.id}">${num} — ${escaparHTML(c.cliente_nombre)} (S/ ${c.total.toFixed(2)})</option>`;
+      selRef.innerHTML += `<option value="${c.id}">${num} — ${c.cliente_nombre} (S/ ${c.total.toFixed(2)})</option>`;
     });
   }
 
@@ -1645,10 +1602,10 @@ async function verFactura(id) {
 
       <div class="fp-section">
         <div class="fp-label">Cliente</div>
-        <div style="font-weight:600;font-size:15px;">${escaparHTML(f.cliente_nombre)}</div>
-        <div style="color:#555;">${f.cliente_documento ? `RUC/DNI: ${escaparHTML(f.cliente_documento)}` : ''}</div>
-        <div style="color:#555;">${escaparHTML(f.cliente_direccion || '')}</div>
-        <div style="color:#555;">${escaparHTML(f.cliente_email || '')}</div>
+        <div style="font-weight:600;font-size:15px;">${f.cliente_nombre}</div>
+        <div style="color:#555;">${f.cliente_documento ? 'RUC/DNI: ' + f.cliente_documento : ''}</div>
+        <div style="color:#555;">${f.cliente_direccion || ''}</div>
+        <div style="color:#555;">${f.cliente_email || ''}</div>
       </div>
 
       ${condicionHtml}

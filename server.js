@@ -12,7 +12,38 @@ if (!sessionSecret) {
   throw new Error('Falta SESSION_SECRET. Configúrala en el entorno antes de iniciar el servidor.');
 }
 
-const db = require('./database');
+const databaseBackend = process.env.DB_PATH === ':memory:'
+  ? 'sqlite'
+  : (process.env.DATABASE_BACKEND || 'postgres');
+if (!['postgres', 'sqlite'].includes(databaseBackend)) {
+  throw new Error('DATABASE_BACKEND debe ser postgres o sqlite.');
+}
+const db = databaseBackend === 'sqlite' ? require('./database') : require('./database-postgres');
+const rutas = databaseBackend === 'postgres'
+  ? {
+    auth: './routes/postgres/auth',
+    clientes: './routes/postgres/clientes',
+    productos: './routes/postgres/productos',
+    inventario: './routes/postgres/inventario',
+    compras: './routes/postgres/compras',
+    proveedores: './routes/postgres/proveedores',
+    tipoCambio: './routes/postgres/tipo-cambio',
+    comprobantes: './routes/postgres/comprobantes',
+    reportes: './routes/postgres/reportes',
+    pdf: './routes/postgres/pdf',
+  }
+  : {
+    auth: './routes/auth',
+    clientes: './routes/clientes',
+    productos: './routes/productos',
+    inventario: './routes/inventario',
+    compras: './routes/compras',
+    proveedores: './routes/proveedores',
+    tipoCambio: './routes/tipo-cambio',
+    comprobantes: './routes/comprobantes',
+    reportes: './routes/reportes',
+    pdf: './routes/pdf',
+  };
 
 const app  = express();
 const PORT = Number(process.env.PORT || 3000);
@@ -53,9 +84,10 @@ function requiereLogin(req, res, next) {
   next();
 }
 
-app.get('/api/health', (req, res) => {
+app.get('/api/health', async (_req, res) => {
   try {
-    db.prepare('SELECT 1').get();
+    if (databaseBackend === 'postgres') await db.healthCheck();
+    else db.prepare('SELECT 1').get();
     res.json({ ok: true });
   } catch {
     res.status(503).json({ ok: false, error: 'Base de datos no disponible' });
@@ -63,18 +95,18 @@ app.get('/api/health', (req, res) => {
 });
 
 // Rutas públicas
-app.use('/api/auth', require('./routes/auth'));
+app.use('/api/auth', require(rutas.auth));
 
 // Rutas protegidas
-app.use('/api/clientes',     requiereLogin, require('./routes/clientes'));
-app.use('/api/productos',    requiereLogin, require('./routes/productos'));
-app.use('/api/inventario',    requiereLogin, require('./routes/inventario'));
-app.use('/api/compras',      requiereLogin, require('./routes/compras'));
-app.use('/api/proveedores',  requiereLogin, require('./routes/proveedores'));
-app.use('/api/tipo-cambio',  requiereLogin, require('./routes/tipo-cambio'));
-app.use('/api/comprobantes', requiereLogin, require('./routes/comprobantes'));
-app.use('/api/reportes',     requiereLogin, require('./routes/reportes'));
-app.use('/api/pdf',          requiereLogin, require('./routes/pdf'));
+app.use('/api/clientes',     requiereLogin, require(rutas.clientes));
+app.use('/api/productos',    requiereLogin, require(rutas.productos));
+app.use('/api/inventario',   requiereLogin, require(rutas.inventario));
+app.use('/api/compras',      requiereLogin, require(rutas.compras));
+app.use('/api/proveedores',  requiereLogin, require(rutas.proveedores));
+app.use('/api/tipo-cambio',  requiereLogin, require(rutas.tipoCambio));
+app.use('/api/comprobantes', requiereLogin, require(rutas.comprobantes));
+app.use('/api/reportes',     requiereLogin, require(rutas.reportes));
+app.use('/api/pdf',          requiereLogin, require(rutas.pdf));
 
 app.use('/api', (req, res) => {
   res.status(404).json({ ok: false, error: 'Ruta no encontrada' });
@@ -105,10 +137,21 @@ app.use((error, req, res, next) => {
 });
 
 if (require.main === module) {
-  app.listen(PORT, () => {
-    console.log(`✓ Servidor corriendo en http://localhost:${PORT}`);
-    console.log(`✓ Entorno: ${process.env.NODE_ENV || 'development'}`);
-  });
+  Promise.resolve(databaseBackend === 'postgres' ? db.initialize() : undefined)
+    .then(() => app.listen(PORT, () => {
+      console.log(`✓ Servidor corriendo en http://localhost:${PORT}`);
+      console.log(`✓ Entorno: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`✓ Base de datos: ${databaseBackend}`);
+    }))
+    .catch(error => {
+      console.error(JSON.stringify({
+        level: 'error',
+        timestamp: new Date().toISOString(),
+        event: 'database_initialization_failed',
+        error: error.name || 'Error',
+      }));
+      process.exitCode = 1;
+    });
 }
 
 module.exports = app;

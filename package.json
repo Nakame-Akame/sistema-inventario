@@ -6,6 +6,7 @@
   "scripts": {
     "admin:create": "node scripts/create-admin.js",
     "db:backup": "node scripts/backup.js",
+    "db:compare:supabase": "node scripts/migrate-sqlite-to-supabase.js --compare",
     "db:migrate:supabase": "node scripts/migrate-sqlite-to-supabase.js",
     "db:restore": "node scripts/restore.js",
     "start": "node server.js",

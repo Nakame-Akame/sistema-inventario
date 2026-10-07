@@ -1,6 +1,7 @@
 const readline = require('node:readline/promises');
 const bcrypt = require('bcryptjs');
-const db = require('../database');
+const useSqlite = process.env.DATABASE_BACKEND === 'sqlite' || process.env.DB_PATH === ':memory:';
+const db = useSqlite ? require('../database') : require('../database-postgres');
 
 async function createAdmin({ nombre, email, password, replaceExisting = false }) {
   const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
@@ -11,22 +12,41 @@ async function createAdmin({ nombre, email, password, replaceExisting = false })
     throw new Error('La contraseña debe tener al menos 12 caracteres.');
   }
 
-  const existing = db.prepare('SELECT id, rol FROM usuarios WHERE email = ?').get(normalizedEmail);
-  const hash = bcrypt.hashSync(password, 12);
+  const existing = useSqlite
+    ? db.prepare('SELECT id, rol FROM usuarios WHERE email = ?').get(normalizedEmail)
+    : (await db.query('SELECT id, rol FROM usuarios WHERE email = $1', [normalizedEmail])).rows[0];
+  const hash = await bcrypt.hash(password, 12);
   if (existing) {
     if (existing.rol !== 'admin' || !replaceExisting) {
       throw new Error('Ese correo ya está registrado.');
     }
-    db.prepare('UPDATE usuarios SET nombre = ?, password = ?, rol = ? WHERE id = ?')
-      .run(nombre.trim(), hash, 'admin', existing.id);
+    if (useSqlite) {
+      db.prepare('UPDATE usuarios SET nombre = ?, password = ?, rol = ? WHERE id = ?')
+        .run(nombre.trim(), hash, 'admin', existing.id);
+    } else {
+      await db.query(
+        "UPDATE usuarios SET nombre = $1, password = $2, rol = 'admin' WHERE id = $3",
+        [nombre.trim(), hash, existing.id],
+      );
+    }
     return existing.id;
   }
 
-  const result = db.prepare(`
+  if (useSqlite) {
+    const result = db.prepare(`
+      INSERT INTO usuarios (nombre, email, password, rol)
+      VALUES (?, ?, ?, 'admin')
+    `).run(nombre.trim(), normalizedEmail, hash);
+    return result.lastInsertRowid;
+  }
+  const result = await db.query(`
     INSERT INTO usuarios (nombre, email, password, rol)
-    VALUES (?, ?, ?, 'admin')
-  `).run(nombre.trim(), normalizedEmail, hash);
-  return result.lastInsertRowid;
+    VALUES ($1, $2, $3, 'admin')
+    ON CONFLICT (email) DO NOTHING
+    RETURNING id
+  `, [nombre.trim(), normalizedEmail, hash]);
+  if (!result.rowCount) throw new Error('Ese correo ya está registrado.');
+  return result.rows[0].id;
 }
 
 async function main() {
@@ -34,8 +54,10 @@ async function main() {
   try {
     const nombre = await prompt.question('Nombre del administrador: ');
     const email = await prompt.question('Correo del administrador: ');
-    const existing = db.prepare('SELECT id, rol FROM usuarios WHERE email = ?')
-      .get(email.trim().toLowerCase());
+    const normalizedEmail = email.trim().toLowerCase();
+    const existing = useSqlite
+      ? db.prepare('SELECT id, rol FROM usuarios WHERE email = ?').get(normalizedEmail)
+      : (await db.query('SELECT id, rol FROM usuarios WHERE email = $1', [normalizedEmail])).rows[0];
     let replaceExisting = false;
     if (existing) {
       if (existing.rol !== 'admin') throw new Error('El correo ya pertenece a un usuario que no es administrador.');
@@ -50,7 +72,8 @@ async function main() {
     console.log(`Administrador listo (id ${id}).`);
   } finally {
     prompt.close();
-    db.close();
+    if (useSqlite) db.close();
+    else await db.close();
   }
 }
 

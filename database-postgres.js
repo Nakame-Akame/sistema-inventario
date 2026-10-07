@@ -46,8 +46,23 @@ async function healthCheck() {
   await pool.query('SELECT 1');
 }
 
+async function initialize() {
+  await pool.query(`
+    INSERT INTO series (tipo, serie, ultimo_numero) VALUES
+      ('factura', 'F001', 0),
+      ('boleta', 'B001', 0),
+      ('nota_pedido', 'NP01', 0),
+      ('guia_remision', 'GR01', 0),
+      ('cotizacion', 'COT1', 0),
+      ('nota_devolucion', 'ND01', 0),
+      ('nota_credito_f', 'NCF1', 0),
+      ('nota_credito_b', 'NCB1', 0)
+    ON CONFLICT (tipo) DO NOTHING
+  `);
+}
+
 async function close() {
   await pool.end();
 }
 
-module.exports = { close, healthCheck, pool, query, transaction };
+module.exports = { close, healthCheck, initialize, pool, query, transaction };

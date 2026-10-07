@@ -149,3 +149,9 @@
 {"timestamp":"2026-10-07T13:04:08.099Z","accion":"login_fallido","ok":false,"ip":"127.0.0.1","method":"POST","path":"/api/auth/login","usuarioId":null,"rol":null,"detalle":{"email":"admin@facturapro.com"}}
 {"timestamp":"2026-10-07T13:04:08.130Z","accion":"login_fallido","ok":false,"ip":"127.0.0.1","method":"POST","path":"/api/auth/login","usuarioId":null,"rol":null,"detalle":{"email":"admin@facturapro.com"}}
 {"timestamp":"2026-10-07T13:04:08.150Z","accion":"login_fallido","ok":false,"ip":"127.0.0.1","method":"POST","path":"/api/auth/login","usuarioId":null,"rol":null,"detalle":{"email":"admin@facturapro.com"}}
+{"timestamp":"2026-10-07T13:49:21.475Z","accion":"login_fallido","ok":false,"ip":"::1","method":"POST","path":"/api/auth/login","usuarioId":null,"rol":null,"detalle":{"email":"tinoco9856@gmail.com","usuarioId":2}}
+{"timestamp":"2026-10-07T13:49:28.392Z","accion":"login_exitoso","ok":true,"ip":"::1","method":"POST","path":"/api/auth/login","usuarioId":2,"rol":"admin","detalle":{"usuarioId":2,"rol":"admin"}}
+{"timestamp":"2026-10-07T16:15:03.641Z","accion":"login_fallido","ok":false,"ip":"::1","method":"POST","path":"/api/auth/login","usuarioId":null,"rol":null,"detalle":{"email":"tinoco9856@gmail.com","usuarioId":2}}
+{"timestamp":"2026-10-07T16:15:09.974Z","accion":"login_fallido","ok":false,"ip":"::1","method":"POST","path":"/api/auth/login","usuarioId":null,"rol":null,"detalle":{"email":"tinoco9856@gmail.com","usuarioId":2}}
+{"timestamp":"2026-10-07T16:15:15.524Z","accion":"login_fallido","ok":false,"ip":"::1","method":"POST","path":"/api/auth/login","usuarioId":null,"rol":null,"detalle":{"email":"tinoco9856@gmail.com","usuarioId":2}}
+{"timestamp":"2026-10-07T16:15:21.640Z","accion":"login_fallido","ok":false,"ip":"::1","method":"POST","path":"/api/auth/login","usuarioId":null,"rol":null,"detalle":{"email":"tinoco9856@gmail.com","usuarioId":2}}

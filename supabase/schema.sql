@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS productos (
   descripcion TEXT,
   precio DOUBLE PRECISION NOT NULL,
   precio_compra DOUBLE PRECISION DEFAULT 0,
-  stock INTEGER DEFAULT 0,
+  stock DOUBLE PRECISION DEFAULT 0,
   categoria TEXT,
   unidad TEXT DEFAULT 'UND',
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
@@ -116,10 +116,10 @@ CREATE TABLE IF NOT EXISTS kardex_movimientos (
   producto_id INTEGER NOT NULL REFERENCES productos(id),
   almacen_id INTEGER NOT NULL REFERENCES almacenes(id),
   tipo TEXT NOT NULL,
-  cantidad INTEGER NOT NULL,
+  cantidad DOUBLE PRECISION NOT NULL,
   costo_unitario DOUBLE PRECISION DEFAULT 0,
-  stock_anterior INTEGER NOT NULL,
-  stock_posterior INTEGER NOT NULL,
+  stock_anterior DOUBLE PRECISION NOT NULL,
+  stock_posterior DOUBLE PRECISION NOT NULL,
   documento_relacionado TEXT,
   observacion TEXT,
   usuario_id INTEGER REFERENCES usuarios(id),
@@ -195,6 +195,13 @@ CREATE TABLE IF NOT EXISTS tipo_cambio_diario (
   fuente TEXT NOT NULL,
   actualizado_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+
+ALTER TABLE productos
+  ALTER COLUMN stock TYPE DOUBLE PRECISION USING stock::DOUBLE PRECISION;
+ALTER TABLE kardex_movimientos
+  ALTER COLUMN cantidad TYPE DOUBLE PRECISION USING cantidad::DOUBLE PRECISION,
+  ALTER COLUMN stock_anterior TYPE DOUBLE PRECISION USING stock_anterior::DOUBLE PRECISION,
+  ALTER COLUMN stock_posterior TYPE DOUBLE PRECISION USING stock_posterior::DOUBLE PRECISION;
 
 CREATE UNIQUE INDEX IF NOT EXISTS proveedores_documento_ci_unique
   ON proveedores (lower(documento));
