@@ -83,13 +83,43 @@ test('serves the page shell and every linked frontend section', async () => {
   assert.match(shellHtml, /page-views-root/);
   assert.match(shellHtml, /fetch\('\/pages\/modals\.html'\)/);
   assert.doesNotMatch(shellHtml, /id="page-dashboard"/);
+  assert.match(shellHtml, /<link id="base-stylesheet" rel="stylesheet" href="\/Style\.css">/);
+  assert.doesNotMatch(shellHtml, /<style\b|\sstyle="/i);
 
   const sections = await Promise.all(pageNames.map(name => fetch(`${api}/pages/${name}.html`)));
   assert.ok(sections.every(response => response.status === 200));
   const sectionHtml = await Promise.all(sections.map(response => response.text()));
+  assert.doesNotMatch(sectionHtml.join('\n'), /<style\b|\sstyle="/i);
+  const sectionStyles = ['ventas', 'facturas', 'reportes', 'compras', 'usuarios', 'modals'];
+  for (const name of sectionStyles) {
+    assert.match(sectionHtml[pageNames.indexOf(name)], new RegExp(`<link rel="stylesheet" data-page-style href="/styles/${name}\\.css">`));
+    const stylesheetResponse = await fetch(`${api}/styles/${name}.css`);
+    assert.equal(stylesheetResponse.status, 200);
+    assert.ok((await stylesheetResponse.text()).trim().length > 0);
+  }
+  assert.match(shellHtml, /link\[data-page-style\]/);
+  assert.match(shellHtml, /insertBefore\(stylesheet, document\.getElementById\('base-stylesheet'\)\)/);
+  assert.match(shellHtml, /await Promise\.all\(stylesheetPromises\.values\(\)\)/);
   assert.ok(sectionHtml[0].includes('id="page-dashboard"'));
   assert.ok(sectionHtml[6].includes('id="page-compras"'));
   assert.ok(sectionHtml[8].includes('id="modal-cobro-factura"'));
+
+  const stylesheet = await fetch(`${api}/Style.css`);
+  assert.equal(stylesheet.status, 200);
+  const css = await stylesheet.text();
+  assert.match(css, /--bg:\s*#eef3ee;/);
+  assert.doesNotMatch(css, /--bg:\s*#0f1117;/);
+  assert.match(css, /\.modal-overlay\s*\{[^}]*display:\s*none;[^}]*position:\s*fixed;/s);
+  assert.match(css, /\.form-grid\s*\{\s*display:\s*grid;/);
+  assert.match(css, /\.page\s*\{\s*display:\s*none;/);
+  assert.match(css, /\.page\.active\s*\{\s*display:\s*block;/);
+  assert.match(css, /\.stats-grid\s*\{\s*display:\s*grid;/);
+  assert.match(css, /#app-shell\.u-hidden\s*\{\s*display:\s*none;/);
+  assert.match(css, /#app-shell\s*\{\s*display:\s*block;/);
+  assert.match(css, /\.login-form label\s*\{\s*display:\s*block;/);
+
+  const modalStylesheet = await fetch(`${api}/styles/modals.css`);
+  assert.match(await modalStylesheet.text(), /\.client-lookup-grid/);
 
   const appScript = await fetch(`${api}/app.js`);
   assert.equal(appScript.status, 200);
@@ -1420,6 +1450,33 @@ test('seller can perform allowed work but receives 403 for restricted actions', 
     }),
   });
   assert.equal(refund.status, 403);
+});
+
+test('profile updates cannot change the account role or permissions', async () => {
+  const { cookie } = await login('vendedor@test.local', 'VendedorSeguro-2026!Pass');
+  const headers = { Cookie: cookie, 'Content-Type': 'application/json' };
+  const profile = await fetch(`${api}/api/auth/me`, { headers: { Cookie: cookie } });
+  const { usuario } = await profile.json();
+
+  const update = await fetch(`${api}/api/auth/perfil`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify({
+      nombre: usuario.nombre,
+      email: usuario.email,
+      rol: 'admin',
+      permisos: ['*'],
+    }),
+  });
+  assert.equal(update.status, 200);
+  assert.equal(db.prepare('SELECT rol FROM usuarios WHERE id = ?').get(usuario.id).rol, 'vendedor');
+
+  const restrictedWrite = await fetch(`${api}/api/productos`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ nombre: 'Producto no autorizado', precio: 10 }),
+  });
+  assert.equal(restrictedWrite.status, 403);
 });
 
 test('generates a PDF for a long document with many product rows', async () => {

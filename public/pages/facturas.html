@@ -1,3 +1,4 @@
+<link rel="stylesheet" data-page-style href="/styles/facturas.css">
 <div class="page" id="page-facturas">
     <div class="table-card">
       <div class="tabs-bar" id="tabs-comprobantes">
@@ -25,12 +26,12 @@
           <div class="dropdown">
             <button class="btn btn-primary" onclick="toggleDropdownNuevo()">+ Otros documentos ▾</button>
             <div class="dropdown-menu" id="dropdown-nuevo">
-              <button class="dropdown-item" onclick="abrirModalFactura('nota_pedido')"><span class="dot" style="background:#f7c948"></span> Nota de pedido</button>
-              <button class="dropdown-item" onclick="abrirModalFactura('guia_remision')"><span class="dot" style="background:#a78bfa"></span> Guía de remisión</button>
-              <button class="dropdown-item" onclick="abrirModalFactura('cotizacion')"><span class="dot" style="background:#7a86a0"></span> Cotización</button>
-              <button class="dropdown-item" onclick="abrirModalFactura('nota_devolucion')"><span class="dot" style="background:#f06585"></span> Nota de devolución</button>
-              <button class="dropdown-item" onclick="abrirModalFactura('nota_credito_f')"><span class="dot" style="background:#38d9a9"></span> Nota de crédito (Factura)</button>
-              <button class="dropdown-item" onclick="abrirModalFactura('nota_credito_b')"><span class="dot" style="background:#4f8ef7"></span> Nota de crédito (Boleta)</button>
+              <button class="dropdown-item" onclick="abrirModalFactura('nota_pedido')"><span class="dot dot--nota-pedido"></span> Nota de pedido</button>
+              <button class="dropdown-item" onclick="abrirModalFactura('guia_remision')"><span class="dot dot--guia-remision"></span> Guía de remisión</button>
+              <button class="dropdown-item" onclick="abrirModalFactura('cotizacion')"><span class="dot dot--cotizacion"></span> Cotización</button>
+              <button class="dropdown-item" onclick="abrirModalFactura('nota_devolucion')"><span class="dot dot--nota-devolucion"></span> Nota de devolución</button>
+              <button class="dropdown-item" onclick="abrirModalFactura('nota_credito_f')"><span class="dot dot--nota-credito-factura"></span> Nota de crédito (Factura)</button>
+              <button class="dropdown-item" onclick="abrirModalFactura('nota_credito_b')"><span class="dot dot--nota-credito-boleta"></span> Nota de crédito (Boleta)</button>
             </div>
           </div>
         </div>

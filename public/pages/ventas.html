@@ -1,3 +1,4 @@
+<link rel="stylesheet" data-page-style href="/styles/ventas.css">
 <div class="page" id="page-ventas">
     <div class="sales-page-head">
       <div><p class="eyebrow">VENTA DIRECTA</p><h2>Productos y emisión</h2></div>
@@ -29,7 +30,7 @@
             <input type="search" id="buscar-cliente-venta" placeholder="8 dígitos DNI / 11 dígitos RUC" onkeydown="if(event.key==='Enter'){event.preventDefault();consultarClienteVenta();}">
             <button class="btn btn-ghost" id="btn-consultar-cliente-venta" type="button" onclick="consultarClienteVenta()">Consultar</button>
           </div>
-          <div id="resultado-cliente-venta" class="alert alert-info" role="status" aria-live="polite" style="display:none;margin:0;"></div>
+          <div id="resultado-cliente-venta" class="alert alert-info u-hidden sale-client-result" role="status" aria-live="polite"></div>
         </div>
 
         <div class="sales-field">
@@ -44,7 +45,7 @@
             <option value="credito">Crédito</option>
           </select>
         </div>
-        <div class="sales-field" id="venta-grupo-vencimiento" style="display:none;">
+        <div class="sales-field u-hidden" id="venta-grupo-vencimiento">
           <label for="venta-vencimiento">Fecha de vencimiento *</label>
           <input type="date" id="venta-vencimiento">
         </div>
@@ -54,8 +55,8 @@
           <p class="sales-subtitle">Aún no agregas productos.</p>
         </div>
         <div class="sales-summary">
-          <div class="total-row"><span style="color:var(--muted)">Subtotal sin IGV</span><span class="mono" id="venta-subtotal">S/ 0.00</span></div>
-          <div class="total-row"><span style="color:var(--muted)">IGV (18%)</span><span class="mono" id="venta-igv">S/ 0.00</span></div>
+          <div class="total-row"><span class="text-muted">Subtotal sin IGV</span><span class="mono" id="venta-subtotal">S/ 0.00</span></div>
+          <div class="total-row"><span class="text-muted">IGV (18%)</span><span class="mono" id="venta-igv">S/ 0.00</span></div>
           <div class="total-row final"><span>TOTAL</span><span class="mono" id="venta-total">S/ 0.00</span></div>
         </div>
         <button class="btn btn-success sales-submit" id="btn-emitir-venta" type="button" onclick="abrirConfirmacionVenta()">Emitir boleta</button>

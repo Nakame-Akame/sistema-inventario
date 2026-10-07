@@ -1,3 +1,4 @@
+<link rel="stylesheet" data-page-style href="/styles/modals.css">
 <!-- ===== MODAL CLIENTE ===== -->
 <div class="modal-overlay" id="modal-cobro-factura">
   <form class="modal modal-lg" onsubmit="guardarCobroFactura(event)">
@@ -72,16 +73,16 @@
     <h2 id="modal-factura-title">Nuevo Comprobante</h2>
     <input type="hidden" id="factura-tipo">
 
-    <div class="form-grid" style="margin-bottom:8px;">
+    <div class="form-grid form-grid--compact">
       <div class="form-group full">
-        <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:end;">
+        <div class="client-lookup-grid">
           <div class="form-group">
             <label for="buscar-cliente-factura">Consultar DNI en RENIEC o RUC en SUNAT</label>
-            <input type="search" id="buscar-cliente-factura" placeholder="8 dígitos DNI / 11 dígitos RUC" oninput="filtrarClientesFactura()" onkeydown="if(event.key==='Enter'){event.preventDefault();consultarClienteDocumento();}" style="width:100%;">
+            <input type="search" id="buscar-cliente-factura" placeholder="8 dígitos DNI / 11 dígitos RUC" oninput="filtrarClientesFactura()" onkeydown="if(event.key==='Enter'){event.preventDefault();consultarClienteDocumento();}" class="w-full">
           </div>
           <button class="btn btn-ghost" id="btn-consultar-documento" type="button" onclick="consultarClienteDocumento()">Consultar</button>
         </div>
-        <div id="resultado-consulta-documento" class="alert alert-info" role="status" aria-live="polite" style="display:none;margin:8px 0 0;"></div>
+        <div id="resultado-consulta-documento" class="alert alert-info u-hidden client-lookup-result" role="status" aria-live="polite"></div>
         <label>Cliente *</label>
         <select id="factura-cliente"></select>
       </div>
@@ -98,14 +99,14 @@
           <option value="credito">Crédito</option>
         </select>
       </div>
-      <div class="form-group" id="grupo-fecha-vencimiento" style="display:none;">
+      <div class="form-group u-hidden" id="grupo-fecha-vencimiento">
         <label>Fecha de caducación *</label>
         <input type="date" id="factura-vencimiento">
       </div>
     </div>
 
     <!-- Campos exclusivos de Guía de Remisión -->
-    <div id="campos-guia" style="display:none;">
+    <div id="campos-guia" class="u-hidden">
       <div class="section-title">Datos del traslado</div>
       <div class="form-grid">
         <div class="form-group"><label>Dirección de partida</label><input type="text" id="guia-partida" placeholder="Almacén Central - Jr. Lima 123"></div>
@@ -116,7 +117,7 @@
     </div>
 
     <!-- Campos exclusivos de Notas de Crédito / Devolución -->
-    <div id="campos-referencia" style="display:none;">
+    <div id="campos-referencia" class="u-hidden">
       <div class="section-title">Comprobante de referencia</div>
       <div class="form-grid">
         <div class="form-group">
@@ -131,13 +132,13 @@
     </div>
 
     <div class="section-title">Agregar productos</div>
-    <div style="display:grid;grid-template-columns:2fr 140px 80px 36px;gap:8px;margin-bottom:12px;align-items:end;">
-      <div class="form-group" style="margin:0">
+    <div class="invoice-item-grid">
+      <div class="form-group form-group--flush">
         <label>Producto</label>
         <select id="item-producto" onchange="mostrarPreciosProducto()"></select>
-        <div id="item-precios-disponibles" style="font-size:12px;color:var(--muted);margin-top:4px;">Unidad: S/ 0.00 · Rebaja: S/ 0.00 · Pase: S/ 0.00</div>
+        <div id="item-precios-disponibles" class="item-price-hint">Unidad: S/ 0.00 · Rebaja: S/ 0.00 · Pase: S/ 0.00</div>
       </div>
-      <div class="form-group" style="margin:0">
+      <div class="form-group form-group--flush">
         <label>Precio</label>
         <select id="item-tipo-precio" onchange="mostrarPreciosProducto()">
           <option value="unidad">Unidad</option>
@@ -145,20 +146,20 @@
           <option value="pase">Pase</option>
         </select>
       </div>
-      <div class="form-group" style="margin:0">
+      <div class="form-group form-group--flush">
         <label>Cantidad</label>
         <input type="number" id="item-cantidad" value="1" min="1">
       </div>
-      <button class="btn btn-success" onclick="agregarItem()" style="height:38px;">+</button>
+      <button class="btn btn-success button--square" onclick="agregarItem()">+</button>
     </div>
 
     <div class="items-list" id="items-lista">
       <div class="item-row header"><span>Producto</span><span>Cant.</span><span>Subtotal</span><span></span></div>
     </div>
 
-    <div class="items-total" id="items-total" style="display:none;">
-      <div class="total-row"><span style="color:var(--muted)">Subtotal</span><span class="mono" id="tot-sub">S/ 0.00</span></div>
-      <div class="total-row" id="fila-igv"><span style="color:var(--muted)">IGV (18%)</span><span class="mono" id="tot-igv">S/ 0.00</span></div>
+    <div class="items-total u-hidden" id="items-total">
+      <div class="total-row"><span class="text-muted">Subtotal</span><span class="mono" id="tot-sub">S/ 0.00</span></div>
+      <div class="total-row" id="fila-igv"><span class="text-muted">IGV (18%)</span><span class="mono" id="tot-igv">S/ 0.00</span></div>
       <div class="total-row final"><span>TOTAL</span><span class="mono" id="tot-total">S/ 0.00</span></div>
     </div>
 
@@ -212,7 +213,7 @@
       <button class="modal-close" type="button" onclick="cerrarModal('modal-confirmar-estado')" aria-label="Cerrar">✕</button>
     </div>
 
-    <div id="confirmar-pago-form" style="display:none;">
+    <div id="confirmar-pago-form" class="u-hidden">
       <div class="modal-confirmar-body">
         <div class="payment-method-shell">
           <aside class="payment-method-sidebar">
@@ -227,7 +228,7 @@
             <input id="confirmar-monto" type="hidden" value="0">
             <input id="confirmar-fecha" type="hidden" value="">
             <input id="confirmar-nro-operacion" type="hidden" value="">
-            <input id="confirmar-evidencia" type="file" accept="image/*" style="display:none;">
+            <input id="confirmar-evidencia" type="file" accept="image/*" class="u-hidden">
           </aside>
 
           <div class="payment-method-content">
@@ -288,14 +289,14 @@
 
         <div class="profile-form-grid">
           <div class="profile-form-group full">
-            <div style="display:flex; align-items:center; gap:14px; margin-bottom:6px;">
-              <div style="width:72px; height:72px; border-radius:50%; background:linear-gradient(135deg, var(--accent), #7cc6ff); overflow:hidden; border:2px solid rgba(255,255,255,0.12); display:flex; align-items:center; justify-content:center; position:relative;">
-                <img id="perfil-avatar-preview" alt="Foto de perfil" style="width:100%; height:100%; object-fit:cover; display:none;">
-                <span id="perfil-avatar-placeholder" style="font-size:26px; font-weight:700; color:#fff;">A</span>
+            <div class="profile-avatar-row">
+              <div class="profile-avatar-frame">
+                <img id="perfil-avatar-preview" alt="Foto de perfil" class="profile-avatar-image u-hidden">
+                <span id="perfil-avatar-placeholder" class="profile-avatar-placeholder">A</span>
               </div>
               <div>
-                <label for="perfil-avatar-input" class="btn btn-ghost btn-sm" style="cursor:pointer;">Cambiar foto</label>
-                <input id="perfil-avatar-input" type="file" accept="image/*" style="display:none;" onchange="handlePerfilArchivo(event)">
+                <label for="perfil-avatar-input" class="btn btn-ghost btn-sm cursor-pointer">Cambiar foto</label>
+                <input id="perfil-avatar-input" type="file" accept="image/*" onchange="handlePerfilArchivo(event)" class="u-hidden">
               </div>
             </div>
           </div>

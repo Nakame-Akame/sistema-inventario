@@ -1,0 +1,18 @@
+.payment-history .fp-table { margin-top: 8px; }
+
+.factura-preview { border-radius: 5px; }
+.fp-title { color: #214634; font-family: var(--display); }
+.fp-num { color: #346b52; }
+.fp-table th { background: #edf2e8; }
+.fp-total-row.final { border-color: #294c36; }
+.form-grid--compact { margin-bottom: 8px; }
+.client-lookup-grid { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; }
+.client-lookup-result { margin: 8px 0 0; }
+.invoice-item-grid { display: grid; grid-template-columns: 2fr 140px 80px 36px; gap: 8px; margin-bottom: 12px; align-items: end; }
+.form-group--flush { margin: 0; }
+.item-price-hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.button--square { height: 38px; }
+.profile-avatar-row { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
+.profile-avatar-frame { width: 72px; height: 72px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), #7cc6ff); overflow: hidden; border: 2px solid rgba(255,255,255,0.12); display: flex; align-items: center; justify-content: center; position: relative; }
+.profile-avatar-image { width: 100%; height: 100%; object-fit: cover; }
+.profile-avatar-placeholder { font-size: 26px; font-weight: 700; color: #fff; }

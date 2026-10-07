@@ -1,0 +1,14 @@
+#page-usuarios #form-usuario { padding: 0 20px 16px; }
+#page-usuarios #form-usuario .user-form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+#page-usuarios #form-usuario .modal-footer { justify-content: flex-end; padding: 12px 0; }
+#page-usuarios .user-permissions-panel { margin: 4px 20px 16px; padding: 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+#page-usuarios .user-permissions-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; margin-bottom: 12px; color: var(--text); font-size: 12px; }
+#page-usuarios .user-permissions-heading span,
+#page-usuarios .user-admin-notice { color: var(--muted); font-size: 11px; }
+#page-usuarios .user-permissions-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(185px, 1fr)); gap: 10px; }
+#page-usuarios .user-permission-group { min-width: 0; padding: 10px; border: 1px solid var(--border); border-radius: 7px; }
+#page-usuarios .user-permission-group legend { padding: 0 5px; color: var(--accent); font-size: 10px; font-weight: 700; }
+#page-usuarios .user-permission-option { display: flex; align-items: flex-start; gap: 7px; margin: 7px 0; color: var(--text); font-size: 11px; text-transform: none; letter-spacing: 0; }
+#page-usuarios .user-permission-option input { flex: 0 0 auto; margin-top: 1px; accent-color: var(--accent); }
+#page-usuarios .user-admin-notice { margin: 0 20px 12px; }
+#page-usuarios table { min-width: 680px; }

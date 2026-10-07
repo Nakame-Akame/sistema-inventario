@@ -1,0 +1,9 @@
+#page-reportes .purchase-report-filters { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; padding: 0 20px 16px; }
+#page-reportes .purchase-report-filters label { display: grid; gap: 5px; min-width: 170px; color: var(--muted); font-size: 10px; font-weight: 700; }
+#page-reportes .purchase-report-filters input { min-height: 36px; }
+#page-reportes .purchase-report-summary { padding: 0 20px 14px; color: var(--accent-strong); font-size: 12px; font-weight: 700; }
+#page-reportes .purchase-report .table-card { box-shadow: none; }
+#page-reportes .purchase-report-payables { margin-top: 18px; border-top: 1px solid var(--border); }
+#page-reportes .purchase-report-payables .table-header { padding-top: 18px; }
+#page-reportes .receivables-report > table { min-width: 920px; }
+#page-reportes .receivables-report .purchase-report-filters { border-bottom: 1px solid var(--border); }
