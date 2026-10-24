@@ -200,3 +200,247 @@ No se migra la base de datos en esta fase. Reevalúa SQLite cuando se observen b
 ## Datos sensibles en Git
 
 Las bases SQLite, respaldos y archivos `.env` están excluidos por `.gitignore`; `.env.example` no contiene secretos. Ignorar un archivo no lo elimina de commits anteriores. Si una base real o un secreto ya se publicó, rota las credenciales y coordina con quien administra el repositorio cualquier limpieza de historial; esta fase no reescribe el historial.
+
+## Documentación técnica y funcional
+
+### Alcance del sistema
+
+FacturaPro es una aplicación web interna de gestión comercial. El frontend está construido con HTML, CSS y JavaScript sin framework; el backend es una API REST de Node.js y Express, y la persistencia se realiza en SQLite mediante `better-sqlite3`. La interfaz y la API se sirven desde el mismo origen. Los importes se manejan en soles (PEN), salvo que una compra se registre en USD y se convierta usando el tipo de cambio disponible.
+
+El sistema cubre:
+
+- Inicio de sesión con cuentas locales, sesiones por cookie y permisos asignados por rol.
+- Clientes y búsqueda opcional de datos de DNI/RUC mediante Decolecta.
+- Catálogo de productos, categorías, precios diferenciados, alertas y niveles de inventario.
+- Ventas, facturas, boletas, notas de pedido, guías de remisión, cotizaciones, devoluciones y notas de crédito.
+- Pagos parciales y cuentas por cobrar; compras a proveedores, abonos y cuentas por pagar.
+- Almacenes, movimientos de stock y consulta del kardex.
+- Dashboard, reportes de ventas/IGV/inventario/compras y exportaciones Excel.
+- Impresión de comprobantes en PDF y generación/verificación de respaldos de la base SQLite.
+
+La configuración de conexión a entornos Beta/Homologación de SUNAT está presente, pero el envío, la firma electrónica y el ciclo de respuesta CDR no están implementados. El sistema no debe considerarse un emisor electrónico de producción.
+
+### Componentes del repositorio
+
+| Ruta | Responsabilidad |
+| --- | --- |
+| `server.js` | Configuración Express, sesiones, cabeceras, límite de intentos de login, rutas API, recursos estáticos y manejo de errores. |
+| `database.js` | Apertura de SQLite, creación/evolución idempotente del esquema y series iniciales. |
+| `routes/` | Controladores HTTP de autenticación, clientes, productos, ventas/documentos, inventario, compras, proveedores, reportes, PDF y tipo de cambio. |
+| `services/` | Reglas de dominio para emitir/actualizar comprobantes, consultar DNI/RUC y configurar los modos de prueba SUNAT. |
+| `middleware/permisos.js` | Roles, catálogo de permisos y middleware de autorización en el servidor. |
+| `public/index.html` | Shell de la interfaz; carga los fragmentos HTML y estilos antes de iniciar la aplicación. |
+| `public/pages/` | Vistas Dashboard, Ventas, Comprobantes, Clientes, Productos, Compras, Reportes, Usuarios y modales. |
+| `public/app.js`, `public/Script.js`, `public/Style.css`, `public/styles/` | Lógica de interfaz, utilidades y estilos comunes/específicos. |
+| `scripts/` | Creación de administrador, importación de productos, compilación de recursos y operaciones de respaldo/restauración. |
+| `services/`, `test/` | Lógica compartida y pruebas automatizadas con Node Test Runner. |
+| `uploads/compras/` | Archivos adjuntos de facturas y guías de compras. |
+| `dist/public/` | Recursos agrupados/minificados generados por `npm run build`; no editar manualmente. |
+
+### Módulos de la interfaz
+
+| Módulo | Uso principal |
+| --- | --- |
+| Dashboard | Indicadores generales, ventas, productos/clientes y alertas de stock. |
+| Ventas | Crear comprobantes a partir del catálogo y cliente, definir pago/condiciones y registrar los documentos relacionados. |
+| Comprobantes | Buscar/listar comprobantes, consultar su detalle, registrar cobros permitidos y gestionar transiciones de estado autorizadas. |
+| Clientes | Crear, consultar, buscar, editar y eliminar clientes; la consulta de documento es opcional. |
+| Productos | Mantener catálogo, datos de identificación, precios, stock, categoría y estado activo. |
+| Compras | Mantener proveedores, registrar documentos y adjuntos de recepción, incluir líneas de productos y pagos. |
+| Reportes | Consultar estadísticas, cuentas por cobrar/pagar y descargar reportes disponibles en Excel. |
+| Usuarios | Alta/listado/eliminación de usuarios y asignación de permisos; acceso administrativo. |
+
+### Configuración de entorno
+
+Las variables se cargan desde `.env` con `dotenv`. La plantilla completa está en `.env.example`; conserva los secretos solo en el entorno local o en el gestor de secretos del despliegue.
+
+| Variable | Descripción |
+| --- | --- |
+| `PORT` | Puerto HTTP; predeterminado `3000`. |
+| `NODE_ENV` | Entorno de ejecución. Con `production`, se sirven recursos compilados y se marcan las cookies como seguras. |
+| `FRONTEND_ASSET_MODE` | Si vale `production`, sirve `dist/public` aunque `NODE_ENV` no sea producción. |
+| `SESSION_SECRET` | Obligatorio; secreto de firma de sesiones. El servidor termina al iniciar si falta. Generar con el comando de instalación indicado arriba. |
+| `DB_PATH` | Ruta de SQLite, absoluta o relativa al proyecto; predeterminada `facturacion.db`. `:memory:` se usa en pruebas. |
+| `LOGIN_RATE_LIMIT` | Número máximo de intentos de login por ventana de 15 minutos; predeterminado `5`. |
+| `BACKUP_DIR` | Directorio de respaldos, absoluto o relativo al proyecto; predeterminado `backups`. |
+| `CORS_ORIGIN` | Lista separada por comas de orígenes permitidos cuando frontend y API están separados; vacío para mismo origen. |
+| `CHROME_EXECUTABLE_PATH` | Ruta opcional al ejecutable local de Chrome/Chromium para PDFs. |
+| `DECOLECTA_API_TOKEN` | Token de servidor para la consulta externa de DNI/RUC; opcional. |
+| `SUNAT_MODE` | `disabled` (predeterminado), `beta` u `homologation`. No existe modo de producción. |
+| `SUNAT_RUC` | RUC de 11 dígitos requerido si se habilita un entorno de prueba SUNAT. |
+| `SUNAT_SOL_USER`, `SUNAT_SOL_PASSWORD` | Usuario secundario y contraseña SOL requeridos solo para `homologation`; nunca para Beta. |
+
+### API REST
+
+Todas las rutas tienen el prefijo `/api`. Salvo `/api/health` y las rutas de autenticación indicadas, requieren una sesión iniciada. Las rutas de negocio verifican además permisos en el backend. Las solicitudes JSON deben enviarse con `Content-Type: application/json`; las compras con adjuntos usan `multipart/form-data`. La mayoría de respuestas usa `{ "ok": true, "data": ... }`; algunas operaciones devuelven `id`, `mensaje`, `total`, `periodo` o `resumen` al mismo nivel. Los errores usan `{ "ok": false, "error": "..." }` (algunas respuestas de inventario usan `message`).
+
+#### Disponibilidad y sesión — `/api`
+
+| Método y ruta | Acceso | Descripción |
+| --- | --- | --- |
+| `GET /health` | Público | Comprueba la conexión SQLite; responde `503` si no está disponible. |
+| `POST /auth/login` | Público | Recibe `email` y `password`; inicia sesión si las credenciales coinciden. Limitado por IP/ventana de 15 minutos. |
+| `POST /auth/logout` | Sesión | Destruye la sesión y limpia la cookie. |
+| `GET /auth/me` | Sesión | Devuelve el usuario y permisos de la sesión actual. |
+| `PUT /auth/perfil` | Sesión | Actualiza nombre/correo y, opcionalmente, contraseña/avatar del usuario actual. |
+| `PUT /auth/cambiar-password` | Sesión | Recibe `password_actual` y `password_nuevo`. |
+| `GET /auth/usuarios` | Administrador | Lista usuarios sin exponer hashes de contraseñas. |
+| `GET /auth/usuarios/permisos` | Administrador | Devuelve los grupos de permisos y permisos iniciales del vendedor. |
+| `POST /auth/usuarios` | Administrador | Crea usuario; recibe `nombre`, `email`, `password`, `rol` y permisos opcionales. |
+| `DELETE /auth/usuarios/:id` | Administrador | Elimina un usuario; no permite eliminarse a sí mismo ni al último administrador. |
+
+#### Clientes, catálogo y tipo de cambio
+
+| Método y ruta | Permiso | Descripción / parámetros |
+| --- | --- | --- |
+| `GET /clientes` | `clientes:ver` | Lista clientes. |
+| `GET /clientes/:id` | `clientes:ver` | Obtiene un cliente. |
+| `GET /clientes/buscar/:texto` | `clientes:ver` | Busca por nombre, documento o correo. |
+| `GET /clientes/consultar-documento/:numero` | `clientes:ver` | Consulta DNI (8 dígitos) o RUC (11) con proveedor externo; 30 solicitudes por IP cada 15 minutos. |
+| `POST /clientes` | `clientes:crear` | Crea cliente. `tipo_documento`: `DNI`, `RUC` o `CE` (predeterminado `DNI`). |
+| `PUT /clientes/:id` | `clientes:editar` | Actualiza datos de cliente. |
+| `DELETE /clientes/:id` | `clientes:eliminar` | Elimina cliente si no hay una restricción referencial que lo impida. |
+| `GET /productos` | `productos:ver` | Lista con filtros opcionales `search`, `categoria`, `activo`, `limit` (máx. 200), `offset`, `sort` y `order`. |
+| `GET /productos/:id` | `productos:ver` | Obtiene producto por ID. |
+| `GET /productos/buscar/:texto` | `productos:ver` | Búsqueda del catálogo. |
+| `GET /productos/alertas/stock-bajo` | `productos:ver` | Lista productos bajo su mínimo o el umbral predeterminado. |
+| `GET /productos/categorias/lista` | `productos:ver` | Lista categorías disponibles. |
+| `POST /productos` | `productos:crear` | Crea producto; datos de catálogo, códigos, precios, costo, stock y umbrales. |
+| `PUT /productos/:id` | `productos:editar` | Reemplaza/actualiza los datos de catálogo del producto. |
+| `PATCH /productos/:id/stock` | `productos:ajustar_stock` | Ajusta stock mediante la operación habilitada por el servidor. |
+| `DELETE /productos/:id` | `productos:eliminar` | Elimina producto cuando sus relaciones lo permiten. |
+| `GET /tipo-cambio` | `compras:ver` | Obtiene el cambio diario de compra/venta; `?actualizar=1` solicita renovación. Si falla el proveedor externo, intenta devolver el último valor guardado. |
+
+Los campos de producto incluyen nombre, descripción, códigos interno/SKU/barras, marca, categoría, unidad, precios de venta Unidad/Rebaja/Pase, costo, stock mínimo/máximo, imagen, activo, IGV, ubicación y proveedor principal. Los nombres concretos de campos de escritura se validan en el backend; para los detalles vigentes, revisar `routes/productos.js`.
+
+#### Comprobantes y PDF
+
+| Método y ruta | Permiso | Descripción / parámetros |
+| --- | --- | --- |
+| `GET /comprobantes` | `comprobantes:ver` | Lista; filtros `tipo`, `fecha_desde`, `fecha_hasta`. Incluye cobrado y saldo pendiente. |
+| `GET /comprobantes/meta/tipos` | `comprobantes:ver` | Tipos, series, numeración actual y metadatos de IGV/stock. |
+| `GET /comprobantes/:id` | `comprobantes:ver` | Detalle, cliente, referencias, cobros y saldo. |
+| `POST /comprobantes` | Permiso según tipo | Emite comprobante. Tipos: `factura`, `boleta`, `nota_pedido`, `guia_remision`, `cotizacion`, `nota_devolucion`, `nota_credito_f`, `nota_credito_b`. |
+| `POST /comprobantes/:id/pagos` | `comprobantes:pagar` | Registra un cobro parcial de factura/boleta a crédito (`monto`, `fecha_pago`, `metodo_pago`, `referencia`). |
+| `PATCH /comprobantes/:id/estado` | Según transición | Recibe `estado`; la autorización y estados destino dependen del tipo. |
+| `GET /pdf/:id` | `comprobantes:ver` | Descarga PDF del comprobante; `formato=a4`, `80mm` o `58mm` (predeterminado A4). |
+
+Una solicitud de comprobante contiene `tipo`, `cliente_id`, `items` y, cuando corresponda, `condicion_pago` (`no_afecta`, `contado`, `credito`), `fecha_vencimiento`, descuento general, referencia/motivo de ajuste y campos de transporte de guía. Cada línea usa `producto_id`, cantidad, unidad, `tipo_precio` (`unidad`, `rebaja` o `pase`) y descuento. Las guías permiten descripción libre. El backend deriva el precio del catálogo y calcula totales/IGV; los precios recibidos desde el cliente no sustituyen los precios del catálogo.
+
+| Tipo | Serie inicial | Comportamiento principal |
+| --- | --- | --- |
+| `factura`, `boleta` | `F001`, `B001` | Venta con IGV y reducción de stock; puede ser contado o crédito. |
+| `nota_pedido` | `NP01` | Documento operativo; no calcula IGV ni mueve stock. |
+| `guia_remision` | `GR01` | Traslado/documento logístico; permite descripción libre y no mueve stock. |
+| `cotizacion` | `COT1` | Oferta con estados borrador/enviado/aprobado/rechazado; no mueve stock. |
+| `nota_devolucion` | `ND01` | Ajuste vinculado a venta del mismo cliente; devuelve stock conforme a lo permitido. |
+| `nota_credito_f`, `nota_credito_b` | `NCF1`, `NCB1` | Ajuste vinculado a factura/boleta; no mueve stock. |
+
+Las series se almacenan en la tabla `series` y se inicializan al abrir la base si aún no existen. Los importes se calculan con redondeo a centavos; la emisión, la reserva del número, los cambios de stock y las transiciones protegidas se procesan con transacciones SQLite.
+
+#### Compras, proveedores e inventario
+
+| Método y ruta | Permiso | Descripción / parámetros |
+| --- | --- | --- |
+| `GET /compras` | `compras:ver` | Historial con filtros `buscar`, `condicion_pago`, `estado`, `desde`, `hasta`; incluye productos, archivos, pagos e importes estimados. |
+| `POST /compras` | `compras:crear` | Registra documento de proveedor; acepta líneas `items` y opcionalmente `archivo_factura`/`archivo_guia` como PDF/JPEG/PNG (máx. 10 MiB por archivo). |
+| `PATCH /compras/:id/pago` | `compras:crear` | Registra el pago completo de una compra a crédito. |
+| `POST /compras/:id/pagos` | `compras:crear` | Registra abono de compra a crédito. |
+| `GET /compras/:id/archivo` | `compras:ver` | Descarga un archivo asociado a la compra. |
+| `GET /proveedores` | `compras:ver` | Lista/busca; `buscar` filtra razón social/documento y `incluir_inactivos=true` incluye inactivos. |
+| `POST /proveedores` | `compras:crear` | Crea proveedor (documento único y razón social obligatorios). |
+| `PUT /proveedores/:id` | `compras:crear` | Actualiza datos del proveedor. |
+| `PATCH /proveedores/:id/estado` | `compras:crear` | Cambia `activo` (booleano). |
+| `GET /inventario/almacenes` | `inventario:ver` | Lista almacenes activos. |
+| `POST /inventario/almacenes` | `inventario:gestionar` | Crea almacén con `nombre`, `codigo` y tipo opcional. |
+| `GET /inventario/kardex` | `inventario:ver` | Lista movimientos; admite `producto_id`, `almacen_id`, `tipo`, `desde`, `hasta`. |
+| `GET /inventario/resumen` | `inventario:ver` | Devuelve stock/valor agregado, alertas y totales por almacén. |
+| `POST /inventario/movimientos` | `inventario:gestionar` | Registra entrada/salida/ajuste/transferencia según los campos validados por la ruta. |
+
+Los tipos kardex documentados son `ENTRADA`, `SALIDA`, `VENTA`, `COMPRA`, `DEVOLUCION`, `AJUSTE` y `TRANSFERENCIA`. Las fechas de filtro son inclusivas y deben tener formato `YYYY-MM-DD`. Una recepción de compra puede afectar existencias y costos dentro de la misma transacción; las compras sin recepción de stock también están contempladas.
+
+#### Reportes
+
+Todas las rutas de `/reportes` requieren `reportes:ver`.
+
+| Método y ruta | Descripción |
+| --- | --- |
+| `GET /reportes/resumen` | Resumen de clientes, productos, ventas, alertas y crédito por cobrar. |
+| `GET /reportes/alertas-stock` | Productos bajo el stock mínimo (o cinco unidades por defecto). |
+| `GET /reportes/ventas-por-dia` | Ventas agrupadas por día de los últimos 30 días. |
+| `GET /reportes/ventas-por-mes` | Ventas agrupadas por mes de los últimos 12 meses. |
+| `GET /reportes/productos-mas-vendidos` | Diez productos con más unidades vendidas e ingresos. |
+| `GET /reportes/mejores-clientes` | Diez clientes con mayor importe de ventas. |
+| `GET /reportes/ventas-por-categoria` | Unidades e ingresos agrupados por categoría. |
+| `GET /reportes/facturas-por-estado` | Cantidad e importe de facturas/boletas por estado. |
+| `GET /reportes/igv-mes` | Base imponible, IGV y total del mes en curso. |
+| `GET /reportes/comprobantes-por-tipo` | Cantidad e importe por tipo de comprobante no anulado. |
+| `GET /reportes/creditos-pendientes` | Créditos de venta pendientes/parciales, saldos y vencimiento. |
+| `GET /reportes/cuentas-por-cobrar?desde=...&hasta=...` | Detalle, totales y agrupación por cliente del rango inclusivo obligatorio. |
+| `GET /reportes/cuentas-por-cobrar/exportar?desde=...&hasta=...` | Excel con cuentas por cobrar y resumen por cliente. |
+| `GET /reportes/compras?desde=...&hasta=...` | Resumen de compras agrupado por proveedor y producto; rango obligatorio. |
+| `GET /reportes/compras/exportar?desde=...&hasta=...` | Excel con hojas Recepciones y Cuentas por pagar. |
+| `GET /reportes/cuentas-por-pagar?desde=...&hasta=...` | Compras a crédito, pagos y saldo estimado del periodo. |
+| `GET /reportes/rango` | Reporte agregado para el rango indicado por los parámetros de fecha validados por la ruta. |
+
+Los reportes consideran las ventas reales (facturas/boletas) y excluyen comprobantes anulados en los agregados de ventas. Las notas de crédito y devoluciones son tipos de reversa en el dominio; el tratamiento específico de cada agregado depende de su consulta.
+
+### Autenticación, permisos y sesiones
+
+El login normaliza el correo y verifica la contraseña con bcrypt. Express Session mantiene la identidad en una cookie `connect.sid` con `httpOnly`, `sameSite=lax` y duración de ocho horas. En `NODE_ENV=production`, la cookie `secure` exige HTTPS. El login regenera el identificador de sesión para evitar reutilización; la API exige sesión para todo el negocio y responde `401` sin ella, o `403` si el usuario no tiene permiso.
+
+El rol `admin` conserva acceso total (`*`). El rol `vendedor` recibe permisos iniciales configurables por administrador; estos permisos se verifican siempre en el backend, no solo ocultando controles en la interfaz. Los permisos cubren clientes, productos, comprobantes, compras/inventario y reportes. Las funciones de usuario administrativo solo están disponibles a administradores. La creación y cambio de contraseña requiere al menos 12 caracteres.
+
+### Modelo de datos
+
+SQLite crea el esquema al iniciar y aplica migraciones incrementales condicionales para columnas nuevas, sin borrar las tablas existentes.
+
+| Tabla | Contenido / relación principal |
+| --- | --- |
+| `usuarios` | Cuenta, correo único, hash bcrypt, rol, permisos serializados y avatar. |
+| `clientes` | Identidad/documento y datos de contacto de clientes. |
+| `productos` | Catálogo, precios, costo, stock y atributos de inventario. |
+| `series` | Tipo de comprobante, serie vigente y último correlativo. |
+| `comprobantes` | Cabecera unificada, cliente, tipo/serie/número, pago, IGV, estado y referencia a documento previo. |
+| `detalle_comprobante` | Líneas y precios/descuentos asociados a un comprobante y producto (o descripción libre). |
+| `pagos_comprobante` | Abonos/cobros de comprobantes, fecha, método, referencia y usuario registrador. |
+| `almacenes` | Ubicaciones/códigos de almacén con estado activo. |
+| `kardex_movimientos` | Movimiento, cantidad, costo, stock anterior/posterior, documento y usuario. |
+| `proveedores` | Catálogo de proveedor; documento único, contactos y estado. |
+| `documentos_compra` | Cabeceras de compras, snapshot de datos del proveedor, moneda, pago y metadatos de adjuntos. |
+| `detalle_documento_compra` | Productos, cantidades, costos y almacén por documento de compra. |
+| `pagos_documento_compra` | Pagos/abonos relacionados a compras. |
+| `tipo_cambio_diario` | Tasas de compra/venta por fecha y fuente del valor. |
+
+Los registros de compra conservan el nombre/documento/dirección del proveedor como snapshot para no alterar el historial al editar el catálogo de proveedores. Los archivos se guardan en disco y la base conserva sus metadatos/rutas. No se deben borrar o mover manualmente esos archivos mientras existan compras que los referencien.
+
+### Integraciones y límites funcionales
+
+- **Decolecta:** la consulta de identidad se ejecuta desde el backend, usa el token `DECOLECTA_API_TOKEN`, tiene timeout de 8 segundos y un límite propio de 30 solicitudes por IP cada 15 minutos. Si el proveedor no está configurado o no responde, la creación manual de clientes sigue disponible.
+- **Tipo de cambio:** consulta el servicio externo de tipo de cambio SUNAT y almacena la tasa del día; si la consulta falla, puede reutilizar la última tasa guardada. No reemplaza una tasa contable aprobada por el negocio.
+- **SUNAT:** solo configuración para pruebas `beta` y `homologation`. No implementar uso real antes de incorporar XML, firma con certificado, envío, respuesta CDR, pruebas integrales y definición de un PSE autorizado.
+- **PDF:** Puppeteer genera A4 o ticket térmico de 80/58 mm. Windows usa Chrome local (configurable con `CHROME_EXECUTABLE_PATH`); Linux puede usar Chromium de Sparticuz.
+- **Excel:** los reportes disponibles se generan con la biblioteca `xlsx`.
+- **Almacenamiento de sesiones:** se usa el almacén de sesión predeterminado de Express Session. Para un servicio de producción con múltiples instancias o persistencia entre reinicios, debe definirse un almacén compartido y compatible con el despliegue.
+
+### Comandos para desarrollo y mantenimiento
+
+| Comando | Uso |
+| --- | --- |
+| `npm start` | Inicia `server.js`. |
+| `npm run admin:create` | Crea el primer administrador o permite restablecer una cuenta administradora existente mediante preguntas en consola. |
+| `npm run build` | Agrupa y minifica frontend en `dist/public`. |
+| `npm test` | Ejecuta todas las pruebas con `node --test`. |
+| `npm run typecheck` | Ejecuta TypeScript sin emitir archivos, con comprobación gradual del servicio de comprobantes. |
+| `npm run db:backup` | Crea y verifica respaldo en `BACKUP_DIR`. |
+| `npm run db:restore -- <archivo>` | Verifica e instala un respaldo; conserva una copia previa si ya existe base destino. |
+| `node scripts/import-productos.js <archivo.xls>` | Importa catálogo desde XLS según las columnas descritas en esta guía. |
+
+### Consideraciones operativas y de seguridad
+
+- Mantén `SESSION_SECRET`, credenciales SOL y token Decolecta fuera del repositorio y de los logs; usa HTTPS en producción.
+- No compartas la base SQLite entre instancias concurrentes ni la pongas en un filesystem de red sin validar sus garantías de bloqueo. Usa un único proceso de escritura; evalúa PostgreSQL solo si concurrencia/disponibilidad medida lo requiere.
+- Protege la carpeta `uploads/compras/` y los respaldos como datos comerciales; limita el acceso del sistema operativo y conserva copias fuera del equipo de producción.
+- El límite de adjuntos es 10 MiB por archivo y el MIME admitido se restringe a PDF, JPEG y PNG. Valida políticas adicionales de retención/escaneo según el entorno donde se despliegue.
+- La aplicación no configura por sí misma proxy TLS, firewall, supervisor de procesos, retención de logs ni estrategia de alta disponibilidad: deben ser parte del despliegue.
+- Valida restauraciones y consistencia sobre una copia de datos antes de reemplazar una base activa. No edites directamente la SQLite con el servidor en funcionamiento.
