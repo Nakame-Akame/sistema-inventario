@@ -58,9 +58,31 @@ npm start
 
 El servidor queda disponible en `http://localhost:3000` (o en el puerto definido por `PORT`). La ruta `GET /api/health` comprueba también que SQLite responde. El frontend usa una ruta relativa `/api`, así que no requiere cambiar código al desplegarlo detrás de otro host o puerto.
 
+### Recursos web de producción
+
+Antes de desplegar, ejecuta `npm run build`. El comando genera `dist/public` con una hoja CSS y un script JavaScript agrupados y minificados en `dist/public/assets/`, sin mapas de código fuente; no se publica el directorio `public` original ni sus hojas separadas. Con `NODE_ENV=production`, Express sirve únicamente `dist/public` y se niega a iniciar si falta la compilación. Instala las dependencias de desarrollo en la etapa de compilación para disponer de los minificadores.
+
+```powershell
+npm run build
+$env:NODE_ENV = 'production'
+npm start
+```
+
+Para probar los recursos minificados localmente sin activar las cookies seguras exclusivas de producción, usa:
+
+```powershell
+npm run build
+$env:FRONTEND_ASSET_MODE = 'production'
+npm start
+```
+
+En un despliegue real, sirve la aplicación por HTTPS (directamente o mediante un proxy TLS) antes de habilitar `NODE_ENV=production`.
+
+El agrupado reduce los recursos separados que aparecen en DevTools y la minificación dificulta leer el código, pero no oculta el HTML/CSS/JavaScript que el navegador necesita ni impide modificaciones locales en DevTools. La autenticación, validación y permisos deben mantenerse en el servidor.
+
 ### Estructura del frontend
 
-`public/index.html` contiene el shell común y carga las vistas desde `public/pages/` antes de iniciar `public/app.js`. Cada pantalla tiene un fragmento HTML propio; los modales compartidos están en `public/pages/modals.html` y los estilos globales en `public/Style.css`.
+`public/index.html` contiene el shell común y carga las vistas desde `public/pages/` antes de iniciar `public/app.js`. Cada pantalla tiene un fragmento HTML propio; los modales compartidos están en `public/pages/modals.html`, los estilos comunes en `public/Style.css` y los estilos específicos en `public/styles/`.
 
 ### Importar productos desde XLS
 

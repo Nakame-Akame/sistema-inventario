@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "admin:create": "node scripts/create-admin.js",
+    "build": "node scripts/build-assets.js",
     "db:backup": "node scripts/backup.js",
     "db:restore": "node scripts/restore.js",
     "start": "node server.js",
@@ -40,7 +41,9 @@
   "devDependencies": {
     "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^26.6.3",
+    "clean-css": "^5.3.3",
     "nodemon": "^3.1.14",
+    "terser": "^5.51.2",
     "typescript": "^5.9.3"
   }
 }

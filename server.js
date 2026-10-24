@@ -5,6 +5,7 @@ const session  = require('express-session');
 const helmet   = require('helmet');
 const { rateLimit } = require('express-rate-limit');
 const path = require('node:path');
+const fs = require('node:fs');
 
 const sessionSecret = process.env.SESSION_SECRET;
 if (!sessionSecret) {
@@ -15,6 +16,11 @@ const db = require('./database');
 
 const app  = express();
 const PORT = Number(process.env.PORT || 3000);
+const useBuiltAssets = process.env.NODE_ENV === 'production'
+  || process.env.FRONTEND_ASSET_MODE === 'production';
+const publicDirectory = useBuiltAssets
+  ? path.join(__dirname, 'dist', 'public')
+  : path.join(__dirname, 'public');
 const corsOrigins = (process.env.CORS_ORIGIN || '')
   .split(',')
   .map(origin => origin.trim())
@@ -76,7 +82,10 @@ app.use('/api', (req, res) => {
   res.status(404).json({ ok: false, error: 'Ruta no encontrada' });
 });
 
-app.use(express.static(path.join(__dirname, 'public')));
+if (useBuiltAssets && !fs.existsSync(publicDirectory)) {
+  throw new Error('Faltan los recursos de producción. Ejecuta "npm run build" antes de iniciar el servidor.');
+}
+app.use(express.static(publicDirectory));
 
 app.use((error, req, res, next) => {
   if (res.headersSent) return next(error);
