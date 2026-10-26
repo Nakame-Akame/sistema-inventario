@@ -1,7 +1,7 @@
 process.env.DB_PATH = ':memory:';
 process.env.SESSION_SECRET = 'test-only-session-secret';
-process.env.LOGIN_RATE_LIMIT = '100';
 process.env.DECOLECTA_API_TOKEN = 'test-decolecta-token';
+process.env.LOGIN_RATE_LIMIT = '1000';
 
 const assert = require('node:assert/strict');
 const { once } = require('node:events');
@@ -62,11 +62,26 @@ async function login(email = 'admin@facturapro.com', password = 'PruebaAdmin-202
   };
 }
 
+function futureDate(days = 30) {
+  const date = new Date();
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
 test('health endpoint responds successfully', async () => {
   const response = await fetch(`${api}/api/health`);
   assert.equal(response.status, 200);
   assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
   assert.deepEqual(await response.json(), { ok: true });
+});
+
+test('sets browser security headers including a restrictive content policy', async () => {
+  const response = await fetch(api);
+  const policy = response.headers.get('content-security-policy') || '';
+  assert.match(policy, /default-src 'self'/);
+  assert.match(policy, /frame-ancestors 'none'/);
+  assert.match(policy, /object-src 'none'/);
+  assert.match(policy, /https:\/\/fonts\.googleapis\.com/);
 });
 
 test('unknown API routes return a consistent JSON 404', async () => {
@@ -107,7 +122,7 @@ test('serves the page shell and every linked frontend section', async () => {
   const stylesheet = await fetch(`${api}/Style.css`);
   assert.equal(stylesheet.status, 200);
   const css = await stylesheet.text();
-  assert.match(css, /--bg:\s*#eef3ee;/);
+  assert.match(css, /--bg:\s*#f5f7f5;/);
   assert.doesNotMatch(css, /--bg:\s*#0f1117;/);
   assert.match(css, /\.modal-overlay\s*\{[^}]*display:\s*none;[^}]*position:\s*fixed;/s);
   assert.match(css, /\.form-grid\s*\{\s*display:\s*grid;/);
@@ -117,6 +132,8 @@ test('serves the page shell and every linked frontend section', async () => {
   assert.match(css, /#app-shell\.u-hidden\s*\{\s*display:\s*none;/);
   assert.match(css, /#app-shell\s*\{\s*display:\s*block;/);
   assert.match(css, /\.login-form label\s*\{\s*display:\s*block;/);
+  assert.match(shellHtml, /class="nav-section-label">Gestión comercial/);
+  assert.match(shellHtml, /<svg viewBox="0 0 24 24">/);
 
   const modalStylesheet = await fetch(`${api}/styles/modals.css`);
   assert.match(await modalStylesheet.text(), /\.client-lookup-grid/);
@@ -148,7 +165,11 @@ test('login accepts valid credentials and rejects invalid credentials', async ()
 });
 
 test('the current user can edit personal information and password', async () => {
-  const { cookie } = await login();
+  const profileEmail = 'perfil@test.local';
+  const profilePassword = 'PerfilSeguro-2026!Pass';
+  db.prepare('INSERT INTO usuarios (nombre, email, password, rol) VALUES (?, ?, ?, ?)')
+    .run('Administrador de perfil', profileEmail, bcrypt.hashSync(profilePassword, 12), 'admin');
+  const { cookie } = await login(profileEmail, profilePassword);
   const update = await fetch(`${api}/api/auth/perfil`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', Cookie: cookie },
@@ -182,18 +203,57 @@ test('the comprobantes endpoint filters by date range', async () => {
 
   const cliente = db.prepare('INSERT INTO clientes (nombre, documento) VALUES (?, ?)').run('Cliente Fechas', '77777777').lastInsertRowid;
   db.prepare('INSERT OR IGNORE INTO series (tipo, serie, ultimo_numero) VALUES (?, ?, ?)').run('factura', 'F', 0);
-  db.prepare('INSERT INTO comprobantes (tipo, serie, numero, cliente_id, condicion_pago, subtotal, igv, descuento, total, afecta_igv, precios_incluyen_igv, estado, fecha) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-    .run('factura', 'F', 1, cliente, 'contado', 100, 18, 0, 118, 1, 0, 'emitido', '2026-01-12');
-  db.prepare('INSERT INTO comprobantes (tipo, serie, numero, cliente_id, condicion_pago, subtotal, igv, descuento, total, afecta_igv, precios_incluyen_igv, estado, fecha) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-    .run('factura', 'F', 2, cliente, 'contado', 200, 36, 0, 236, 1, 0, 'emitido', '2026-01-25');
+  const first = db.prepare('INSERT INTO comprobantes (tipo, serie, numero, cliente_id, condicion_pago, subtotal, igv, descuento, total, afecta_igv, precios_incluyen_igv, estado, fecha) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .run('factura', 'F', 1, cliente, 'contado', 100, 18, 0, 118, 1, 0, 'emitido', '2026-01-12').lastInsertRowid;
+  const second = db.prepare('INSERT INTO comprobantes (tipo, serie, numero, cliente_id, condicion_pago, subtotal, igv, descuento, total, afecta_igv, precios_incluyen_igv, estado, fecha) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .run('factura', 'F', 2, cliente, 'contado', 200, 36, 0, 236, 1, 0, 'emitido', '2026-01-25').lastInsertRowid;
 
-  const response = await fetch(`${api}/api/comprobantes?fecha_desde=2026-01-10&fecha_hasta=2026-01-20`, { headers });
-  assert.equal(response.status, 200);
-  const body = await response.json();
-  assert.equal(body.ok, true);
-  assert.equal(body.data.length, 1);
-  assert.equal(body.data[0].numero, 1);
-  assert.equal(body.data[0].fecha.slice(0, 10), '2026-01-12');
+  try {
+    const response = await fetch(`${api}/api/comprobantes?fecha_desde=2026-01-10&fecha_hasta=2026-01-20`, { headers });
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.ok, true);
+    assert.equal(body.data.length, 1);
+    assert.equal(body.data[0].numero, 1);
+    assert.equal(body.data[0].fecha.slice(0, 10), '2026-01-12');
+  } finally {
+    db.prepare('DELETE FROM comprobantes WHERE id IN (?, ?)').run(first, second);
+    db.prepare('DELETE FROM clientes WHERE id = ?').run(cliente);
+  }
+});
+
+test('editing a client preserves or updates its document type', async () => {
+  const { cookie } = await login();
+  const clientId = db.prepare('INSERT INTO clientes (nombre, documento) VALUES (?, ?)').run('Cliente editable', '12345678').lastInsertRowid;
+  const update = (body) => fetch(`${api}/api/clientes/${clientId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Cookie: cookie },
+    body: JSON.stringify(body),
+  });
+
+  const updateType = await update({
+    nombre: 'Cliente editado',
+    documento: '20123456789',
+    tipo_documento: 'RUC',
+    direccion: 'Lima',
+    email: 'cliente@test.local',
+    telefono: '999999999',
+  });
+  assert.equal(updateType.status, 200);
+  assert.equal(db.prepare('SELECT tipo_documento FROM clientes WHERE id = ?').get(clientId).tipo_documento, 'RUC');
+
+  const preserveType = await update({
+    nombre: 'Cliente editado nuevamente',
+    documento: '20123456789',
+    direccion: 'Lima',
+    email: 'cliente@test.local',
+    telefono: '999999999',
+  });
+  assert.equal(preserveType.status, 200);
+  assert.equal(db.prepare('SELECT tipo_documento FROM clientes WHERE id = ?').get(clientId).tipo_documento, 'RUC');
+
+  const invalidType = await update({ nombre: 'Cliente editado', documento: '123', tipo_documento: 'PASAPORTE' });
+  assert.equal(invalidType.status, 400);
 });
 
 test('admin can create administrator and seller accounts with separated permissions', async () => {
@@ -1029,6 +1089,7 @@ test('records partial purchase payments and prevents paying beyond the balance',
     headers,
     body: JSON.stringify({
       condicion_pago: 'credito',
+      fecha_factura: '2026-10-01',
       proveedor_documento: '20433333331',
       proveedor_razon_social: 'Proveedor pagos parciales',
       producto_id: product.id,
@@ -1531,7 +1592,7 @@ test('accepts yape and bcp payment methods with optional evidence', async () => 
       tipo: 'factura',
       cliente_id: 1,
       condicion_pago: 'credito',
-      fecha_vencimiento: '2026-10-20',
+      fecha_vencimiento: futureDate(),
       items: [{ producto_id: product.id, cantidad: 1 }],
     }),
   });
@@ -1582,7 +1643,7 @@ test('collects partial credit-invoice payments and reports net receivables', asy
       tipo: 'factura',
       cliente_id: 1,
       condicion_pago: 'credito',
-      fecha_vencimiento: '2026-10-20',
+      fecha_vencimiento: futureDate(),
       items: [{ producto_id: product.id, cantidad: 1 }],
     }),
   });

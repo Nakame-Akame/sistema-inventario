@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FacturaPro — Sistema de Facturación</title>
-<meta name="theme-color" content="#18312b">
+<meta name="theme-color" content="#153d30">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -45,14 +45,23 @@
     <small>Gestión comercial</small>
   </div>
   <nav class="nav" aria-label="Navegación principal">
-    <button class="nav-item active" onclick="goTo('dashboard')"><span class="icon">📊</span> Dashboard</button>
-    <button class="nav-item" onclick="goTo('ventas')"><span class="icon">🛒</span> Ventas</button>
-    <button class="nav-item" onclick="goTo('facturas')"><span class="icon">🧾</span> Comprobantes</button>
-    <button class="nav-item" onclick="goTo('clientes')"><span class="icon">👥</span> Clientes</button>
-    <button class="nav-item" onclick="goTo('productos')"><span class="icon">📦</span> Productos</button>
-    <button class="nav-item" onclick="goTo('compras')"><span class="icon">📥</span> Compras</button>
-    <button class="nav-item" onclick="goTo('reportes')"><span class="icon">📈</span> Reportes</button>
-    <button class="nav-item u-hidden" id="nav-usuarios" onclick="goTo('usuarios')"><span class="icon">⚙</span> Usuarios</button>
+    <div class="nav-section">
+      <span class="nav-section-label">Principal</span>
+      <button class="nav-item active" title="Dashboard" onclick="goTo('dashboard')"><span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1.5"></rect><rect x="14" y="3" width="7" height="5" rx="1.5"></rect><rect x="14" y="11" width="7" height="10" rx="1.5"></rect><rect x="3" y="14" width="8" height="7" rx="1.5"></rect></svg></span><span class="nav-label">Dashboard</span></button>
+    </div>
+    <div class="nav-section">
+      <span class="nav-section-label">Gestión comercial</span>
+      <button class="nav-item" title="Ventas" onclick="goTo('ventas')"><span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 3h2l2.2 11.2a2 2 0 0 0 2 1.6h8.9a2 2 0 0 0 1.9-1.4L22 8H6"></path><circle cx="10" cy="20" r="1"></circle><circle cx="18" cy="20" r="1"></circle></svg></span><span class="nav-label">Ventas</span></button>
+      <button class="nav-item" title="Comprobantes" onclick="goTo('facturas')"><span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"></path><path d="M14 3v5h5M9 12h7M9 16h7"></path></svg></span><span class="nav-label">Comprobantes</span></button>
+      <button class="nav-item" title="Clientes" onclick="goTo('clientes')"><span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"></circle><path d="M3 20v-1a6 6 0 0 1 12 0v1M16 5.2a3.5 3.5 0 0 1 0 6.6M18 14a4.5 4.5 0 0 1 3 4.3v.7"></path></svg></span><span class="nav-label">Clientes</span></button>
+      <button class="nav-item" title="Productos" onclick="goTo('productos')"><span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5 9-5Z"></path><path d="m3 12 9 5 9-5M3 16l9 5 9-5"></path></svg></span><span class="nav-label">Productos</span></button>
+      <button class="nav-item" title="Compras" onclick="goTo('compras')"><span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4zM8 8h8M8 12h8M8 16h5"></path><path d="m16 3 3 3"></path></svg></span><span class="nav-label">Compras</span></button>
+      <button class="nav-item" title="Reportes" onclick="goTo('reportes')"><span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"></path><path d="m7 14 4-4 3 3 6-7"></path></svg></span><span class="nav-label">Reportes</span></button>
+    </div>
+    <div class="nav-section">
+      <span class="nav-section-label">Administración</span>
+      <button class="nav-item u-hidden" id="nav-usuarios" title="Usuarios" onclick="goTo('usuarios')"><span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"></circle><path d="M3 20v-1a6 6 0 0 1 12 0v1M18 8v6M15 11h6"></path></svg></span><span class="nav-label">Usuarios</span></button>
+    </div>
   </nav>
   <div class="sidebar-footer">
     <p>FacturaPro v1.0</p>
@@ -65,7 +74,7 @@
   <!-- TOPBAR -->
   <header class="topbar">
     <div class="topbar-copy">
-      <p class="topbar-kicker"><span>/</span> OPERACIONES</p>
+      <p class="topbar-kicker">OPERACIONES <span aria-hidden="true">/</span> <span id="page-breadcrumb">Dashboard</span></p>
       <h1 id="page-title">Dashboard</h1>
     </div>
     <div class="topbar-right">

@@ -73,13 +73,17 @@ router.post('/', requierePermiso('clientes:crear'), (req, res) => {
 router.put('/:id', requierePermiso('clientes:editar'), (req, res) => {
   try {
     const { nombre, documento, direccion, email, telefono } = req.body;
+    const tipoDocumento = req.body.tipo_documento;
+    if (tipoDocumento !== undefined && !['DNI', 'RUC', 'CE'].includes(tipoDocumento)) {
+      return res.status(400).json({ ok: false, error: 'Tipo de documento inválido' });
+    }
     const existe = db.prepare('SELECT id FROM clientes WHERE id = ?').get(req.params.id);
     if (!existe) return res.status(404).json({ ok: false, error: 'Cliente no encontrado' });
 
     db.prepare(`
-      UPDATE clientes SET nombre=?, documento=?, direccion=?, email=?, telefono=?
+      UPDATE clientes SET nombre=?, documento=?, tipo_documento=COALESCE(?, tipo_documento), direccion=?, email=?, telefono=?
       WHERE id=?
-    `).run(nombre, documento, direccion, email, telefono, req.params.id);
+    `).run(nombre, documento, tipoDocumento ?? null, direccion, email, telefono, req.params.id);
 
     res.json({ ok: true, mensaje: 'Cliente actualizado' });
   } catch (err) {

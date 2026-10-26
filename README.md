@@ -27,16 +27,23 @@ Configura los valores de `.env` según el entorno:
 | Variable | Uso | Valor predeterminado |
 | --- | --- | --- |
 | `PORT` | Puerto HTTP | `3000` |
+| `HOST` | Interfaz de red donde escucha Node; producción debe usar loopback | `0.0.0.0` |
 | `NODE_ENV` | Entorno de ejecución | `development` |
 | `SESSION_SECRET` | Firma de cookies de sesión; obligatorio | Sin valor |
 | `DB_PATH` | Archivo SQLite; puede ser una ruta absoluta o relativa al proyecto | `facturacion.db` |
-| `LOGIN_RATE_LIMIT` | Intentos de login por ventana | `5` |
+| `TRUST_PROXY_HOPS` | Proxies inversos confiables delante de Node; usa `1` con un único Nginx local | `0` |
+| `LOGIN_RATE_LIMIT` | Intentos fallidos permitidos por IP cada 15 minutos | `5` |
 | `BACKUP_DIR` | Directorio para respaldos; puede ser absoluto o relativo al proyecto | `backups` |
+| `BACKUP_OFFSITE_DIR` | Directorio montado en almacenamiento externo, separado del servidor | Vacío |
+| `BACKUP_ENCRYPTION_KEY` | Clave hexadecimal de 32 bytes para cifrar copias externas | Sin valor |
+| `BACKUP_RETENTION_DAYS` | Días de retención de copias generadas | `30` |
 | `CORS_ORIGIN` | Orígenes externos autorizados separados por coma; déjalo vacío para mismo origen | Vacío |
 | `CHROME_EXECUTABLE_PATH` | Ruta de Chrome/Chromium local para generar PDF | Detección automática |
 | `DECOLECTA_API_TOKEN` | Token Bearer para consultar DNI/RUC desde el servidor | Sin valor |
 
-No copies secretos reales a `.env.example` ni al repositorio. En producción sirve la interfaz y la API desde el mismo origen siempre que sea posible. Si la interfaz vive en otro origen, añade su origen exacto a `CORS_ORIGIN` (por ejemplo `https://ventas.ejemplo.com`).
+No copies secretos reales a `.env.example` ni al repositorio. En producción sirve la interfaz y la API desde el mismo origen siempre que sea posible. Si la interfaz vive en otro origen, añade su origen exacto HTTPS a `CORS_ORIGIN` (por ejemplo `https://ventas.ejemplo.com`).
+
+Cada IP puede realizar hasta cinco intentos fallidos de inicio de sesión cada 15 minutos; los accesos correctos no consumen el límite. En producción, configura `TRUST_PROXY_HOPS` con la cantidad exacta de proxies confiables y no expongas directamente el puerto de Node.
 
 ## Generación de PDF
 
@@ -84,6 +91,27 @@ El agrupado reduce los recursos separados que aparecen en DevTools y la minifica
 
 `public/index.html` contiene el shell común y carga las vistas desde `public/pages/` antes de iniciar `public/app.js`. Cada pantalla tiene un fragmento HTML propio; los modales compartidos están en `public/pages/modals.html`, los estilos comunes en `public/Style.css` y los estilos específicos en `public/styles/`.
 
+### App móvil con Expo Go
+
+La app nativa está en `mobile/` y consume la misma API y base de datos. Para abrirla en un iPhone o Android:
+
+1. Inicia el backend con `npm start` y averigua la IPv4 local de la computadora con `ipconfig`.
+2. Conecta el teléfono y la computadora a la misma red Wi-Fi.
+3. Desde PowerShell ejecuta:
+
+   ```powershell
+   Set-Location mobile
+   npm install
+   npx expo start --lan
+   ```
+
+4. Escanea el QR desde Expo Go en el teléfono.
+5. En el primer inicio, escribe la dirección del servidor con el formato `http://IP-DE-LA-PC:3000` y luego inicia sesión con tu usuario habitual.
+
+No uses `localhost` como dirección del servidor en el teléfono: eso apuntaría al propio teléfono. Si la conexión no responde, permite el puerto del backend en el firewall de Windows y confirma que la IP no haya cambiado. Para acceso fuera de la red local, despliega la API con HTTPS antes de configurar esa URL.
+
+La app móvil incluye dashboard, ventas, comprobantes, clientes, productos, compras, reportes y usuarios. Los módulos y acciones disponibles siguen dependiendo de los permisos aplicados por el backend. Los adjuntos de documentos de compra y las funciones de impresión/exportación todavía se realizan desde la versión web.
+
 ### Importar productos desde XLS
 
 Para cargar un catálogo con las columnas `Producto`, `Precio Unidad`, `Precio Mayor`, `Precio Especial`, `Precio Compra Promedio`, `Stock Real` y `Familia`:
@@ -101,7 +129,7 @@ npm test
 npm run typecheck
 ```
 
-Las pruebas usan SQLite en memoria y no escriben en `facturacion.db`. El chequeo TypeScript está habilitado gradualmente para `services/comprobantes.js`; el servidor y las rutas continúan ejecutándose como CommonJS/JavaScript.
+Las pruebas usan SQLite en memoria y no escriben en `facturacion.db`. `npm run typecheck` ejecuta el chequeo TypeScript de la app móvil Expo.
 
 ## Reglas de comprobantes
 
@@ -152,7 +180,15 @@ npm run db:backup
 npm run db:restore -- .\backups\facturacion-<fecha>.db
 ```
 
+Para restaurar una copia externa cifrada, configura `BACKUP_ENCRYPTION_KEY` y pasa su archivo `.db.enc`:
+
+```powershell
+npm run db:restore -- /mnt/facturapro-offsite/facturacion-<fecha>.db.enc
+```
+
 El respaldo se verifica con `quick_check`. Las rutas relativas de `DB_PATH` y `BACKUP_DIR` se resuelven desde el directorio del proyecto, incluso al ejecutar un comando programado desde otra carpeta. Antes de restaurar, detén el servidor; si ya existe una base en el destino, el comando conserva una copia previa junto a ella. Las pruebas automáticas verifican respaldo, restauración e integridad usando archivos temporales.
+
+Cuando `BACKUP_OFFSITE_DIR` está configurado, cada ejecución crea una segunda copia cifrada con AES-256-GCM y verifica que se pueda descifrar y abrir. `BACKUP_ENCRYPTION_KEY` debe ser una clave hexadecimal de 32 bytes, distinta de `SESSION_SECRET`; si se pierde, no será posible restaurar las copias externas. Guárdala en un gestor de secretos o en una copia de recuperación protegida, nunca junto con los respaldos. El directorio externo debe existir y, en Linux, estar montado en un sistema de archivos distinto; el script falla explícitamente si el montaje no está disponible. Las copias automáticas generadas se conservan durante `BACKUP_RETENTION_DAYS`; otros archivos y las copias de recuperación de una restauración no se borran. No uses solo otra carpeta del mismo disco como copia externa.
 
 ### Programar respaldos
 
@@ -165,21 +201,42 @@ $trigger = New-ScheduledTaskTrigger -Daily -At 2:00AM
 Register-ScheduledTask -TaskName "SistemaFacturacionBackup" -Action $action -Trigger $trigger -Description "Respaldo diario de SQLite"
 ```
 
-En Linux/macOS, agrega una entrada de `cron` con la ruta absoluta al proyecto (ajusta usuario y directorio):
+En el servidor Linux, define las rutas en `.env`, monta primero el almacenamiento externo y comprueba manualmente que `npm run db:backup` termine mostrando ambas copias verificadas. Después agrega una entrada de `cron` con la ruta absoluta al proyecto y el usuario del servicio (ajusta las rutas):
 
 ```cron
-0 2 * * * cd /ruta/al/proyecto && /usr/bin/npm run db:backup >> /var/log/sistema-facturacion-backup.log 2>&1
+0 2 * * * cd /opt/facturapro && /usr/bin/npm run db:backup >> /var/log/facturapro-backup.log 2>&1
 ```
 
-Comprueba periódicamente el historial/resultado de la tarea y conserva copias fuera del equipo de producción. Para ensayar recuperación: detén el servidor, restaura una copia reciente con `npm run db:restore -- <archivo>`, confirma el mensaje de éxito, inicia el servidor y verifica `GET /api/health` y los datos esperados. Haz el primer ensayo en una copia aislada, no sobre la base real.
+Comprueba el log de cada ejecución y configura una alerta si el comando falla. Para ensayar recuperación al menos mensualmente: detén el servidor, restaura una copia reciente con `npm run db:restore -- <archivo>`, confirma el mensaje de éxito, inicia el servidor y verifica `GET /api/health` y los datos esperados. Haz el primer ensayo en una copia aislada, no sobre la base real.
 
 ## Despliegue y operación
 
-1. Instala Node.js y npm; clona o extrae el proyecto en una carpeta persistente.
-2. Ejecuta `npm install`, crea `.env` desde `.env.example`, establece `SESSION_SECRET` y define `DB_PATH`/`BACKUP_DIR` si no usarás las rutas locales predeterminadas.
+1. Instala Node.js y npm en un servidor con disco persistente; crea un usuario de servicio sin privilegios y clona el proyecto en una carpeta controlada.
+2. Ejecuta `npm install`, crea `.env` desde `.env.example`, establece un `SESSION_SECRET` aleatorio (mínimo 32 bytes en producción) y define rutas persistentes para `DB_PATH`, `BACKUP_DIR` y el volumen montado en `BACKUP_OFFSITE_DIR`.
 3. Ejecuta `npm run admin:create` una sola vez para crear el administrador inicial. No incluyas la contraseña en comandos o logs.
-4. Ejecuta `npm test` y luego `npm start`. En despliegues permanentes, ejecuta Node con un supervisor de procesos del sistema operativo y configura proxy HTTPS; no expongas la app directamente a Internet sin TLS.
-5. Programa y verifica los respaldos. Antes de actualizar, crea un respaldo, detén el proceso, actualiza dependencias con `npm install`, ejecuta pruebas y vuelve a iniciar.
+4. Ejecuta `npm test` y `npm run build`; configura `NODE_ENV=production`, `HOST=127.0.0.1` y `TRUST_PROXY_HOPS=1` si hay un único Nginx inverso local. Usa HTTPS en Nginx, redirige HTTP a HTTPS y limita el firewall para que el puerto de Node solo acepte conexiones locales.
+5. Ejecuta Node con `systemd` u otro supervisor y restringe permisos de `.env`, la base y los respaldos al usuario del servicio.
+6. Programa respaldos diarios y revisa su resultado. Antes de actualizar, crea un respaldo, detén el proceso, actualiza dependencias con `npm install`, ejecuta pruebas y vuelve a iniciar.
+
+No publiques el puerto de Node directamente en Internet. El proxy debe reenviar `Host`, `X-Forwarded-For` y `X-Forwarded-Proto`; configura `TRUST_PROXY_HOPS` solo para los proxies bajo tu control. La aplicación activa cookies `Secure` en `NODE_ENV=production` y rechaza iniciar producción sin un secreto de sesión fuerte, una base persistente y un directorio externo configurado.
+
+Helmet aplica una política de seguridad de contenido que limita recursos al mismo origen y evita marcos/objetos; se mantienen scripts y estilos inline porque el frontend actual todavía los utiliza. Para eliminar por completo esa excepción y endurecer CSP, primero habría que migrar esos bloques y manejadores inline a scripts externos o nonces.
+
+Ejemplo de rutas para `.env` en Linux (ajústalas al volumen real; no copies el secreto de ejemplo):
+
+```dotenv
+NODE_ENV=production
+PORT=3000
+HOST=127.0.0.1
+TRUST_PROXY_HOPS=1
+LOGIN_RATE_LIMIT=5
+DB_PATH=/var/lib/facturapro/facturacion.db
+BACKUP_DIR=/var/backups/facturapro
+BACKUP_OFFSITE_DIR=/mnt/facturapro-offsite
+BACKUP_RETENTION_DAYS=30
+```
+
+Genera `SESSION_SECRET` con `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"` y una clave diferente para `BACKUP_ENCRYPTION_KEY` con `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`; guárdalas en `.env` y protege la clave de cifrado en otro lugar seguro. Asegúrate de que `/mnt/facturapro-offsite` ya esté montado desde almacenamiento separado antes de correr la tarea. Limita permisos, por ejemplo `chmod 600 .env`, y concede escritura de la base y los respaldos únicamente al usuario del servicio.
 
 Los errores no controlados de API producen JSON uniforme para el cliente y una línea JSON con nivel, fecha, método, ruta, estado y tipo de error en el log del proceso. No se registran cuerpos de solicitudes ni mensajes que puedan incluir datos sensibles. `GET /api/health` devuelve `503` si SQLite no responde.
 
@@ -224,7 +281,7 @@ La configuración de conexión a entornos Beta/Homologación de SUNAT está pres
 
 | Ruta | Responsabilidad |
 | --- | --- |
-| `server.js` | Configuración Express, sesiones, cabeceras, límite de intentos de login, rutas API, recursos estáticos y manejo de errores. |
+| `server.js` | Configuración Express, sesiones, cabeceras, rutas API, recursos estáticos y manejo de errores. |
 | `database.js` | Apertura de SQLite, creación/evolución idempotente del esquema y series iniciales. |
 | `routes/` | Controladores HTTP de autenticación, clientes, productos, ventas/documentos, inventario, compras, proveedores, reportes, PDF y tipo de cambio. |
 | `services/` | Reglas de dominio para emitir/actualizar comprobantes, consultar DNI/RUC y configurar los modos de prueba SUNAT. |
@@ -257,12 +314,17 @@ Las variables se cargan desde `.env` con `dotenv`. La plantilla completa está e
 | Variable | Descripción |
 | --- | --- |
 | `PORT` | Puerto HTTP; predeterminado `3000`. |
+| `HOST` | Interfaz de escucha; en producción solo loopback (`127.0.0.1` o `::1`). |
 | `NODE_ENV` | Entorno de ejecución. Con `production`, se sirven recursos compilados y se marcan las cookies como seguras. |
 | `FRONTEND_ASSET_MODE` | Si vale `production`, sirve `dist/public` aunque `NODE_ENV` no sea producción. |
-| `SESSION_SECRET` | Obligatorio; secreto de firma de sesiones. El servidor termina al iniciar si falta. Generar con el comando de instalación indicado arriba. |
+| `SESSION_SECRET` | Obligatorio; secreto aleatorio de firma de sesiones (mínimo 32 bytes en producción). |
 | `DB_PATH` | Ruta de SQLite, absoluta o relativa al proyecto; predeterminada `facturacion.db`. `:memory:` se usa en pruebas. |
-| `LOGIN_RATE_LIMIT` | Número máximo de intentos de login por ventana de 15 minutos; predeterminado `5`. |
+| `TRUST_PROXY_HOPS` | Cantidad exacta de proxies inversos confiables; `1` para un Nginx local, `0` si no hay proxy. |
+| `LOGIN_RATE_LIMIT` | Intentos fallidos por IP cada 15 minutos; predeterminado `5`. |
 | `BACKUP_DIR` | Directorio de respaldos, absoluto o relativo al proyecto; predeterminado `backups`. |
+| `BACKUP_OFFSITE_DIR` | Directorio separado y montado para la segunda copia cifrada; obligatorio en producción. |
+| `BACKUP_ENCRYPTION_KEY` | Clave hex de 32 bytes para AES-256-GCM; obligatoria en producción y para restaurar `.db.enc`. |
+| `BACKUP_RETENTION_DAYS` | Días de retención de respaldos automáticos; predeterminado `30`. |
 | `CORS_ORIGIN` | Lista separada por comas de orígenes permitidos cuando frontend y API están separados; vacío para mismo origen. |
 | `CHROME_EXECUTABLE_PATH` | Ruta opcional al ejecutable local de Chrome/Chromium para PDFs. |
 | `DECOLECTA_API_TOKEN` | Token de servidor para la consulta externa de DNI/RUC; opcional. |
@@ -421,7 +483,7 @@ Los registros de compra conservan el nombre/documento/dirección del proveedor c
 - **SUNAT:** solo configuración para pruebas `beta` y `homologation`. No implementar uso real antes de incorporar XML, firma con certificado, envío, respuesta CDR, pruebas integrales y definición de un PSE autorizado.
 - **PDF:** Puppeteer genera A4 o ticket térmico de 80/58 mm. Windows usa Chrome local (configurable con `CHROME_EXECUTABLE_PATH`); Linux puede usar Chromium de Sparticuz.
 - **Excel:** los reportes disponibles se generan con la biblioteca `xlsx`.
-- **Almacenamiento de sesiones:** se usa el almacén de sesión predeterminado de Express Session. Para un servicio de producción con múltiples instancias o persistencia entre reinicios, debe definirse un almacén compartido y compatible con el despliegue.
+- **Almacenamiento de sesiones:** las sesiones se guardan en la misma base SQLite persistente, expiran a las ocho horas y se eliminan al cerrar sesión. Mantén una sola instancia de Node mientras SQLite sea la base de datos; SQLite en disco local no está pensado para varias instancias distribuidas.
 
 ### Comandos para desarrollo y mantenimiento
 
@@ -431,7 +493,7 @@ Los registros de compra conservan el nombre/documento/dirección del proveedor c
 | `npm run admin:create` | Crea el primer administrador o permite restablecer una cuenta administradora existente mediante preguntas en consola. |
 | `npm run build` | Agrupa y minifica frontend en `dist/public`. |
 | `npm test` | Ejecuta todas las pruebas con `node --test`. |
-| `npm run typecheck` | Ejecuta TypeScript sin emitir archivos, con comprobación gradual del servicio de comprobantes. |
+| `npm run typecheck` | Comprueba los tipos de la app móvil sin emitir archivos. |
 | `npm run db:backup` | Crea y verifica respaldo en `BACKUP_DIR`. |
 | `npm run db:restore -- <archivo>` | Verifica e instala un respaldo; conserva una copia previa si ya existe base destino. |
 | `node scripts/import-productos.js <archivo.xls>` | Importa catálogo desde XLS según las columnas descritas en esta guía. |

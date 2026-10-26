@@ -32,7 +32,7 @@
 	padding: 13px 16px;
 	border: 1px solid #dce8d8;
 	border-radius: 10px;
-	background: linear-gradient(110deg, #eef7e9 0%, #f9fbf6 100%);
+	background: #f6faf6;
 }
 #page-compras .purchase-rate-field { display: grid; gap: 6px; min-width: 190px; }
 #page-compras .purchase-rate-field label { color: var(--text); }
@@ -87,7 +87,7 @@
 }
 #page-compras .purchase-upload-card {
 	padding: 16px;
-	border: 1px solid #dfe9dc;
+	border: 1px solid var(--border);
 	border-radius: 10px;
 	background: #fff;
 	box-shadow: 0 6px 16px rgba(28, 57, 39, 0.04);

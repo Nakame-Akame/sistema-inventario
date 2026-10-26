@@ -1,6 +1,6 @@
 process.env.DB_PATH = ':memory:';
 process.env.SESSION_SECRET = 'test-only-session-secret';
-process.env.LOGIN_RATE_LIMIT = '2';
+process.env.LOGIN_RATE_LIMIT = '5';
 
 const assert = require('node:assert/strict');
 const { once } = require('node:events');
@@ -23,14 +23,17 @@ test.after(async () => {
   }
 });
 
-test('login rate limit rejects repeated attempts', async () => {
+test('limits failed login attempts for each client IP', async () => {
   const request = () => fetch(`${api}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email: 'unknown@test.local', password: 'wrong-password' }),
   });
 
-  assert.equal((await request()).status, 401);
-  assert.equal((await request()).status, 401);
-  assert.equal((await request()).status, 429);
+  for (let attempt = 0; attempt < 5; attempt++) {
+    assert.equal((await request()).status, 401);
+  }
+  const limited = await request();
+  assert.equal(limited.status, 429);
+  assert.match(limited.headers.get('retry-after') || '', /^\d+$/);
 });

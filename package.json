@@ -10,7 +10,7 @@
     "db:restore": "node scripts/restore.js",
     "start": "node server.js",
     "test": "node --test",
-    "typecheck": "tsc --noEmit --project tsconfig.json"
+    "typecheck": "npm --prefix mobile run typecheck"
   },
   "repository": {
     "type": "git",

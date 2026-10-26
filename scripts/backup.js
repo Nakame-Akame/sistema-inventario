@@ -2,7 +2,10 @@ const { createBackup } = require('./sqlite-backups');
 
 if (require.main === module) {
   createBackup()
-    .then(filePath => console.log(`Respaldo verificado: ${filePath}`))
+    .then(({ localPath, offsitePath }) => {
+      console.log(`Respaldo verificado: ${localPath}`);
+      if (offsitePath) console.log(`Copia externa verificada: ${offsitePath}`);
+    })
     .catch(error => {
       console.error(error.message);
       process.exitCode = 1;

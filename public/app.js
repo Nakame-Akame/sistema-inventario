@@ -29,6 +29,7 @@ function goTo(page) {
   });
   const titles = { dashboard: 'Dashboard', ventas: 'Ventas', facturas: 'Comprobantes', clientes: 'Clientes', productos: 'Productos', compras: 'Compras', reportes: 'Reportes', usuarios: 'Usuarios' };
   document.getElementById('page-title').textContent = titles[page] || page;
+  document.getElementById('page-breadcrumb').textContent = titles[page] || page;
 
   if (page === 'dashboard') cargarDashboard();
   if (page === 'ventas') cargarVentas();
@@ -1990,7 +1991,7 @@ function mostrarApp(usuario) {
       .some(permiso => permisos.has(permiso));
     const permitida = accesoTotal || (requisitos.every(permiso => permisos.has(permiso)) &&
       (pagina !== 'ventas' || puedeCrearVenta));
-    boton.style.display = permitida ? '' : 'none';
+    boton.classList.toggle('u-hidden', !permitida);
     if (permitida && !primeraPagina) primeraPagina = pagina;
   }
   if (primeraPagina) goTo(primeraPagina);
