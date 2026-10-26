@@ -12,7 +12,7 @@ npm install
 Copy-Item .env.example .env
 ```
 
-Si npm 11 informa que el script de instalación de `better-sqlite3` está pendiente de aprobación, revisa y autoriza ese paquete con `npm approve-scripts better-sqlite3` y ejecuta `npm rebuild better-sqlite3`. Es el binding nativo que necesita SQLite; no apruebes scripts de otros paquetes sin revisarlos.
+SQLite se conserva para importar o recuperar la base local. Si npm 11 informa que el script de instalación de `better-sqlite3` está pendiente de aprobación, revisa y autoriza ese paquete con `npm approve-scripts better-sqlite3` y ejecuta `npm rebuild better-sqlite3`.
 
 Genera un secreto de sesión y colócalo en `SESSION_SECRET` dentro de `.env`:
 
@@ -22,6 +22,32 @@ node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
 
 El servidor se niega a iniciar si `SESSION_SECRET` está vacío.
 
+## Migrar datos SQLite a Supabase
+
+La aplicación usa PostgreSQL de Supabase por defecto. La importación conserva el archivo SQLite original. Copia la cadena PostgreSQL del proyecto desde Supabase (Database > Connect) a `SUPABASE_DB_URL` en `.env`. Esta variable debe contener la cadena de conexión de la base de datos, no una clave `anon` o `service_role`, y debe mantenerse privada.
+
+Aplica `supabase/schema.sql` en el SQL Editor de Supabase antes de iniciar el servidor o importar. Revisa cuántos registros se importarían; este comando solo lee el archivo SQLite y no se conecta a Supabase:
+
+```powershell
+npm run db:migrate:supabase
+```
+
+Si Supabase ya tiene datos, compara ambos lados antes de decidir qué hacer. El comando siguiente es de solo lectura, no muestra los valores de los registros y resume conteos, claves coincidentes y columnas diferentes:
+
+```powershell
+npm run db:compare:supabase
+```
+
+La importación inserta los datos solo si todas las tablas de destino están vacías. Si ya existen todas las filas SQLite y coinciden por identificador y contenido, el comando detecta que la importación está completa y termina sin escribir; conserva cualquier fila adicional que solo exista en Supabase. Si encuentra filas faltantes o diferentes, se detiene sin mezclarlas ni sobrescribirlas. No borres datos para hacer pasar esta protección.
+
+Cuando el destino esté vacío, ejecuta la importación transaccional:
+
+```powershell
+npm run db:migrate:supabase -- --apply
+```
+
+El importador se niega a combinar datos si encuentra registros en cualquiera de las tablas de destino. Cuando termine, inicia el servidor con `DATABASE_BACKEND=postgres` (el valor predeterminado) y `SUPABASE_DB_URL` configurado. Para volver temporalmente a SQLite, define explícitamente `DATABASE_BACKEND=sqlite`.
+
 Configura los valores de `.env` según el entorno:
 
 | Variable | Uso | Valor predeterminado |
@@ -30,9 +56,11 @@ Configura los valores de `.env` según el entorno:
 | `HOST` | Interfaz de red donde escucha Node; producción debe usar loopback | `0.0.0.0` |
 | `NODE_ENV` | Entorno de ejecución | `development` |
 | `SESSION_SECRET` | Firma de cookies de sesión; obligatorio | Sin valor |
-| `DB_PATH` | Archivo SQLite; puede ser una ruta absoluta o relativa al proyecto | `facturacion.db` |
 | `TRUST_PROXY_HOPS` | Proxies inversos confiables delante de Node; usa `1` con un único Nginx local | `0` |
-| `LOGIN_RATE_LIMIT` | Intentos fallidos permitidos por IP cada 15 minutos | `5` |
+| `DATABASE_BACKEND` | Base usada por la aplicación (`postgres` o `sqlite`) | `postgres` |
+| `DB_PATH` | Archivo SQLite de origen para la importación o el modo SQLite; puede ser absoluto o relativo al proyecto | `facturacion.db` |
+| `SUPABASE_DB_URL` | Cadena privada de conexión PostgreSQL usada por la aplicación y el importador | Sin valor |
+| `LOGIN_RATE_LIMIT` | Intentos fallidos de inicio de sesión por IP cada 15 minutos | `5` |
 | `BACKUP_DIR` | Directorio para respaldos; puede ser absoluto o relativo al proyecto | `backups` |
 | `BACKUP_OFFSITE_DIR` | Directorio montado en almacenamiento externo, separado del servidor | Vacío |
 | `BACKUP_ENCRYPTION_KEY` | Clave hexadecimal de 32 bytes para cifrar copias externas | Sin valor |
@@ -63,7 +91,7 @@ El comando solicita nombre, correo y contraseña (mínimo 12 caracteres), y alma
 npm start
 ```
 
-El servidor queda disponible en `http://localhost:3000` (o en el puerto definido por `PORT`). La ruta `GET /api/health` comprueba también que SQLite responde. El frontend usa una ruta relativa `/api`, así que no requiere cambiar código al desplegarlo detrás de otro host o puerto.
+El servidor queda disponible en `http://localhost:3000` (o en el puerto definido por `PORT`). Al usar PostgreSQL, inicializa las series predeterminadas y `GET /api/health` verifica la conexión. El frontend usa una ruta relativa `/api`, así que no requiere cambiar código al desplegarlo detrás de otro host o puerto.
 
 ### Recursos web de producción
 
@@ -137,7 +165,7 @@ Las pruebas usan SQLite en memoria y no escriben en `facturacion.db`. `npm run t
 - Para líneas de producto, el precio siempre sale del catálogo; cualquier precio enviado por el navegador se ignora. Las guías pueden llevar una descripción libre sin precio.
 - Importes y descuentos se normalizan a centavos con redondeo decimal. El descuento por línea no puede exceder su precio y el descuento general no puede exceder el subtotal.
 - Devoluciones y notas de crédito requieren un comprobante de venta del mismo cliente y no pueden ajustar más unidades que las aún disponibles.
-- Emisión, reserva de serie, movimientos de stock, anulación y devolución usan transacciones SQLite. No se permite stock negativo; las anulaciones repetidas o transiciones de estado no autorizadas se rechazan.
+- Emisión, reserva de serie, cobros, recepción de compras, movimientos de stock, anulación y devolución usan transacciones en la base configurada. PostgreSQL bloquea las filas involucradas para evitar consumir stock o números de serie concurrentemente. No se permite stock negativo; las anulaciones repetidas o transiciones de estado no autorizadas se rechazan.
 
 ## Inventario y kardex
 
@@ -175,6 +203,10 @@ El administrador puede crear cuentas desde la sección Usuarios y asignar los ro
 
 ## Respaldar y restaurar
 
+En modo PostgreSQL, configura y verifica los respaldos administrados por Supabase (incluida la retención/PITR disponible en tu plan) y ensaya la restauración antes de producción. `npm run db:backup` y `npm run db:restore` operan únicamente sobre archivos SQLite; no respaldan ni restauran la base Supabase. Conserva aparte una copia inmutable del archivo SQLite original hasta validar el corte.
+
+Para el modo SQLite o la base de origen:
+
 ```powershell
 npm run db:backup
 npm run db:restore -- .\backups\facturacion-<fecha>.db
@@ -192,7 +224,7 @@ Cuando `BACKUP_OFFSITE_DIR` está configurado, cada ejecución crea una segunda 
 
 ### Programar respaldos
 
-Programa `npm run db:backup` diariamente con el usuario del sistema operativo que tenga acceso al proyecto y a `.env`. Por ejemplo, en Windows PowerShell, desde la carpeta del proyecto:
+Programa `npm run db:backup` diariamente solo si estás usando SQLite o si quieres respaldar la base SQLite de origen. Para PostgreSQL, usa las herramientas de respaldo de Supabase. Por ejemplo, en Windows PowerShell, desde la carpeta del proyecto:
 
 ```powershell
 $project = (Get-Location).Path
@@ -212,11 +244,12 @@ Comprueba el log de cada ejecución y configura una alerta si el comando falla. 
 ## Despliegue y operación
 
 1. Instala Node.js y npm en un servidor con disco persistente; crea un usuario de servicio sin privilegios y clona el proyecto en una carpeta controlada.
-2. Ejecuta `npm install`, crea `.env` desde `.env.example`, establece un `SESSION_SECRET` aleatorio (mínimo 32 bytes en producción) y define rutas persistentes para `DB_PATH`, `BACKUP_DIR` y el volumen montado en `BACKUP_OFFSITE_DIR`.
-3. Ejecuta `npm run admin:create` una sola vez para crear el administrador inicial. No incluyas la contraseña en comandos o logs.
-4. Ejecuta `npm test` y `npm run build`; configura `NODE_ENV=production`, `HOST=127.0.0.1` y `TRUST_PROXY_HOPS=1` si hay un único Nginx inverso local. Usa HTTPS en Nginx, redirige HTTP a HTTPS y limita el firewall para que el puerto de Node solo acepte conexiones locales.
-5. Ejecuta Node con `systemd` u otro supervisor y restringe permisos de `.env`, la base y los respaldos al usuario del servicio.
-6. Programa respaldos diarios y revisa su resultado. Antes de actualizar, crea un respaldo, detén el proceso, actualiza dependencias con `npm install`, ejecuta pruebas y vuelve a iniciar.
+2. Ejecuta `npm install`, crea `.env` desde `.env.example`, establece un `SESSION_SECRET` aleatorio (mínimo 32 bytes en producción) y `SUPABASE_DB_URL`. Aplica `supabase/schema.sql` en Supabase.
+3. Para importar datos de SQLite, revisa primero los conteos con `npm run db:migrate:supabase`; cuando el destino esté vacío, ejecuta `npm run db:migrate:supabase -- --apply` una sola vez. Conserva el archivo SQLite original.
+4. Configura rutas persistentes para `DB_PATH`, `BACKUP_DIR` y el volumen montado en `BACKUP_OFFSITE_DIR`. Para PostgreSQL, configura y verifica los respaldos de Supabase.
+5. Ejecuta `npm run admin:create` solo si necesitas crear o restablecer el administrador después de la importación. No incluyas la contraseña en comandos o logs.
+6. Ejecuta `npm test` y `npm run build`; configura `NODE_ENV=production`, `HOST=127.0.0.1` y `TRUST_PROXY_HOPS=1` si hay un único Nginx inverso local. Usa HTTPS en Nginx, redirige HTTP a HTTPS y limita el firewall para que el puerto de Node solo acepte conexiones locales.
+7. Ejecuta Node con `systemd` u otro supervisor, restringe permisos de `.env` y respaldos al usuario del servicio y programa respaldos diarios. Antes de actualizar, verifica que exista un respaldo restaurable, detén el proceso, actualiza dependencias con `npm install`, ejecuta pruebas y vuelve a iniciar.
 
 No publiques el puerto de Node directamente en Internet. El proxy debe reenviar `Host`, `X-Forwarded-For` y `X-Forwarded-Proto`; configura `TRUST_PROXY_HOPS` solo para los proxies bajo tu control. La aplicación activa cookies `Secure` en `NODE_ENV=production` y rechaza iniciar producción sin un secreto de sesión fuerte, una base persistente y un directorio externo configurado.
 
@@ -238,7 +271,7 @@ BACKUP_RETENTION_DAYS=30
 
 Genera `SESSION_SECRET` con `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"` y una clave diferente para `BACKUP_ENCRYPTION_KEY` con `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`; guárdalas en `.env` y protege la clave de cifrado en otro lugar seguro. Asegúrate de que `/mnt/facturapro-offsite` ya esté montado desde almacenamiento separado antes de correr la tarea. Limita permisos, por ejemplo `chmod 600 .env`, y concede escritura de la base y los respaldos únicamente al usuario del servicio.
 
-Los errores no controlados de API producen JSON uniforme para el cliente y una línea JSON con nivel, fecha, método, ruta, estado y tipo de error en el log del proceso. No se registran cuerpos de solicitudes ni mensajes que puedan incluir datos sensibles. `GET /api/health` devuelve `503` si SQLite no responde.
+Los errores no controlados de API producen JSON uniforme para el cliente y una línea JSON con nivel, fecha, método, ruta, estado y tipo de error en el log del proceso. No se registran cuerpos de solicitudes ni mensajes que puedan incluir datos sensibles. `GET /api/health` devuelve `503` si la base configurada no responde.
 
 ### Consulta de DNI y RUC
 
@@ -249,10 +282,6 @@ El selector de clientes puede consultar DNI en RENIEC y RUC en SUNAT por medio d
 La conexión real de producción no está habilitada. SUNAT documenta dos entornos de prueba. Beta usa el endpoint beta y credenciales de prueba (`RUC+MODDATOS` / `MODDATOS`), sin requerir certificado digital registrado. Homologación SQA usa el endpoint `https://ww1.sunat.gob.pe/ol-ti-itcpgem-sqa/billService` y credenciales SOL secundarias autorizadas para el perfil de envío. La contraseña SOL no debe usarse en Beta ni compartirse por chat. La configuración solo acepta `SUNAT_MODE=disabled`, `beta` u `homologation`, fija los endpoints HTTPS y rechaza ambos modos si `NODE_ENV=production`.
 
 Para Beta configura `SUNAT_MODE=beta` y `SUNAT_RUC`. Para homologación configura `SUNAT_MODE=homologation`, `SUNAT_RUC`, `SUNAT_SOL_USER` y `SUNAT_SOL_PASSWORD` solo en `.env` local, y verifica con SUNAT el usuario secundario/perfil habilitado. No coloques credenciales en comandos, logs ni el repositorio. La Clave SOL autentica la llamada SOAP; la firma XMLDSig requiere aparte el certificado digital registrado del emisor. La configuración no envía comprobantes todavía; el XML, firma, envío y ciclo CDR deben completarse y probarse antes de considerar terminada la fase 4. La arquitectura final elegida sigue siendo un PSE autorizado, cuya API y credenciales sandbox deben definirse antes del despliegue.
-
-### Criterios para evaluar PostgreSQL
-
-No se migra la base de datos en esta fase. Reevalúa SQLite cuando se observen bloqueos de escritura frecuentes bajo concurrencia real, varios procesos/instancias escribiendo a la vez, crecimiento de usuarios simultáneos que afecte latencia o requisitos de alta disponibilidad/operación centralizada. Antes de aprobar una migración: medir esos indicadores, diseñar mapeo de esquema y tipos, ensayar exportación/importación en una copia, comparar conteos e importes, preparar periodo de solo lectura/corte, plan de reversión y respaldo restaurable. No ejecutar la migración hasta aprobar el plan y validar una prueba integral.
 
 ## Datos sensibles en Git
 
@@ -449,7 +478,7 @@ Los reportes consideran las ventas reales (facturas/boletas) y excluyen comproba
 
 ### Autenticación, permisos y sesiones
 
-El login normaliza el correo y verifica la contraseña con bcrypt. Express Session mantiene la identidad en una cookie `connect.sid` con `httpOnly`, `sameSite=lax` y duración de ocho horas. En `NODE_ENV=production`, la cookie `secure` exige HTTPS. El login regenera el identificador de sesión para evitar reutilización; la API exige sesión para todo el negocio y responde `401` sin ella, o `403` si el usuario no tiene permiso.
+El login normaliza el correo y verifica la contraseña con bcrypt. Express Session mantiene la identidad en una cookie `connect.sid` con `httpOnly`, `sameSite=lax` y duración de ocho horas; los datos de sesión persisten en la base seleccionada. En `NODE_ENV=production`, la cookie `secure` exige HTTPS. El login regenera el identificador de sesión para evitar reutilización; la API exige sesión para todo el negocio y responde `401` sin ella, o `403` si el usuario no tiene permiso.
 
 El rol `admin` conserva acceso total (`*`). El rol `vendedor` recibe permisos iniciales configurables por administrador; estos permisos se verifican siempre en el backend, no solo ocultando controles en la interfaz. Los permisos cubren clientes, productos, comprobantes, compras/inventario y reportes. Las funciones de usuario administrativo solo están disponibles a administradores. La creación y cambio de contraseña requiere al menos 12 caracteres.
 

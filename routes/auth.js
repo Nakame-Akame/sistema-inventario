@@ -9,6 +9,11 @@ const {
   ROLES_VALIDOS,
   requierePermiso,
 } = require('../middleware/permisos');
+const {
+  esEmailValido,
+  sanitizarTexto,
+  registrarAuditoria,
+} = require('../middleware/seguridad');
 
 // Crear tabla de usuarios si no existe
 db.exec(`
@@ -52,18 +57,23 @@ function permisosDeUsuario(usuario) {
 // POST - Login
 router.post('/login', (req, res) => {
   try {
-    const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
-    const { password } = req.body;
-    if (!email || typeof password !== 'string' || !password)
+    const email = sanitizarTexto(typeof req.body?.email === 'string' ? req.body.email : '', 254).toLowerCase();
+    const password = typeof req.body?.password === 'string' ? req.body.password : '';
+    if (!email || !password || password.length < 8 || password.length > 128 || !esEmailValido(email)) {
       return res.status(400).json({ ok: false, error: 'Email y contraseña son requeridos' });
+    }
 
     const usuario = db.prepare('SELECT * FROM usuarios WHERE email = ?').get(email);
-    if (!usuario)
+    if (!usuario) {
+      registrarAuditoria({ req, accion: 'login_fallido', detalle: { email }, ok: false });
       return res.status(401).json({ ok: false, error: 'Correo o contraseña incorrectos' });
+    }
 
     const valido = bcrypt.compareSync(password, usuario.password);
-    if (!valido)
+    if (!valido) {
+      registrarAuditoria({ req, accion: 'login_fallido', detalle: { email, usuarioId: usuario.id }, ok: false });
       return res.status(401).json({ ok: false, error: 'Correo o contraseña incorrectos' });
+    }
 
     req.session.regenerate(err => {
       if (err) return res.status(500).json({ ok: false, error: 'No se pudo iniciar sesión' });
@@ -77,16 +87,19 @@ router.post('/login', (req, res) => {
       };
       req.session.save(saveError => {
         if (saveError) return res.status(500).json({ ok: false, error: 'No se pudo iniciar sesión' });
+        registrarAuditoria({ req, accion: 'login_exitoso', detalle: { usuarioId: usuario.id, rol: usuario.rol } });
         res.json({ ok: true, usuario: req.session.usuario, mensaje: 'Sesión iniciada' });
       });
     });
   } catch (err) {
+    registrarAuditoria({ req, accion: 'login_error', ok: false, detalle: { error: 'login_exception' } });
     res.status(500).json({ ok: false, error: 'No se pudo iniciar sesión' });
   }
 });
 
 // POST - Logout
 router.post('/logout', (req, res) => {
+  const usuarioId = req.session?.usuario?.id ?? null;
   req.session.destroy(err => {
     if (err) return res.status(500).json({ ok: false, error: 'No se pudo cerrar sesión' });
     res.clearCookie('connect.sid', {
@@ -94,6 +107,7 @@ router.post('/logout', (req, res) => {
       sameSite: 'lax',
       secure: process.env.NODE_ENV === 'production',
     });
+    registrarAuditoria({ req, accion: 'logout', detalle: { usuarioId } });
     res.json({ ok: true, mensaje: 'Sesión cerrada' });
   });
 });
@@ -108,13 +122,14 @@ router.get('/me', (req, res) => {
 // POST - Crear nuevo usuario (solo admin)
 router.post('/usuarios', requierePermiso('usuarios:administrar'), (req, res) => {
   try {
-    const { nombre, password } = req.body;
-    const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
-    const rol = req.body.rol || 'vendedor';
-    if (!nombre || !email || typeof password !== 'string')
+    const nombre = sanitizarTexto(typeof req.body?.nombre === 'string' ? req.body.nombre : '', 120);
+    const password = typeof req.body?.password === 'string' ? req.body.password : '';
+    const email = sanitizarTexto(typeof req.body?.email === 'string' ? req.body.email : '', 254).toLowerCase();
+    const rol = typeof req.body?.rol === 'string' ? req.body.rol.trim() : 'vendedor';
+    if (!nombre || !email || !password)
       return res.status(400).json({ ok: false, error: 'Nombre, email y contraseña son requeridos' });
-    if (password.length < 12)
-      return res.status(400).json({ ok: false, error: 'La contraseña debe tener al menos 12 caracteres' });
+    if (password.length < 12 || password.length > 128 || !esEmailValido(email))
+      return res.status(400).json({ ok: false, error: 'Datos de usuario no válidos' });
     if (!ROLES_VALIDOS.includes(rol))
       return res.status(400).json({ ok: false, error: 'Rol inválido' });
 
@@ -135,8 +150,9 @@ router.post('/usuarios', requierePermiso('usuarios:administrar'), (req, res) => 
     const result = db.prepare(`
       INSERT INTO usuarios (nombre, email, password, rol, permisos)
       VALUES (?, ?, ?, ?, ?)
-    `).run(nombre.trim(), email, hash, rol, JSON.stringify(permisos));
+    `).run(nombre, email, hash, rol, JSON.stringify(permisos));
 
+    registrarAuditoria({ req, accion: 'usuario_creado', detalle: { usuarioId: result.lastInsertRowid, rol } });
     res.status(201).json({ ok: true, id: result.lastInsertRowid, mensaje: 'Usuario creado' });
   } catch (err) {
     res.status(500).json({ ok: false, error: 'No se pudo crear el usuario' });
@@ -179,6 +195,7 @@ router.delete('/usuarios/:id', requierePermiso('usuarios:administrar'), (req, re
     }
 
     db.prepare('DELETE FROM usuarios WHERE id = ?').run(usuario.id);
+    registrarAuditoria({ req, accion: 'usuario_eliminado', detalle: { usuarioId: usuario.id, eliminadoPor: req.session.usuario.id } });
     res.json({ ok: true, mensaje: 'Usuario eliminado' });
   } catch (err) {
     res.status(500).json({ ok: false, error: 'No se pudo eliminar el usuario' });
@@ -191,16 +208,15 @@ router.put('/perfil', (req, res) => {
     if (!req.session.usuario)
       return res.status(401).json({ ok: false, error: 'No autenticado' });
 
-    const nombre = typeof req.body.nombre === 'string' ? req.body.nombre.trim() : '';
-    const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
-    const password = typeof req.body.password === 'string' ? req.body.password : '';
-    const avatar = typeof req.body.avatar === 'string' ? req.body.avatar.trim() : '';
+    const nombre = sanitizarTexto(typeof req.body?.nombre === 'string' ? req.body.nombre : '', 120);
+    const email = sanitizarTexto(typeof req.body?.email === 'string' ? req.body.email : '', 254).toLowerCase();
+    const password = typeof req.body?.password === 'string' ? req.body.password : '';
+    const avatar = typeof req.body?.avatar === 'string' ? req.body.avatar.trim() : '';
 
     if (!nombre || !email)
       return res.status(400).json({ ok: false, error: 'Nombre y correo son requeridos' });
 
-    const emailValido = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-    if (!emailValido)
+    if (!esEmailValido(email))
       return res.status(400).json({ ok: false, error: 'Ingresa un correo electrónico válido' });
 
     const usuario = db.prepare('SELECT * FROM usuarios WHERE id = ?').get(req.session.usuario.id);
@@ -239,6 +255,7 @@ router.put('/perfil', (req, res) => {
       db.prepare(`UPDATE usuarios SET ${campos.join(', ')} WHERE id = ?`).run(...valores, usuario.id);
     }
 
+    registrarAuditoria({ req, accion: 'perfil_actualizado', detalle: { usuarioId: usuario.id } });
     const usuarioActualizado = db.prepare('SELECT * FROM usuarios WHERE id = ?').get(usuario.id);
     req.session.usuario = {
       id: usuarioActualizado.id,
@@ -268,7 +285,7 @@ router.put('/cambiar-password', (req, res) => {
     const { password_actual, password_nuevo } = req.body;
     if (!password_actual || !password_nuevo)
       return res.status(400).json({ ok: false, error: 'Ambas contraseñas son requeridas' });
-    if (typeof password_nuevo !== 'string' || password_nuevo.length < 12)
+    if (typeof password_nuevo !== 'string' || password_nuevo.length < 12 || password_nuevo.length > 128)
       return res.status(400).json({ ok: false, error: 'La nueva contraseña debe tener al menos 12 caracteres' });
 
     const usuario = db.prepare('SELECT * FROM usuarios WHERE id = ?').get(req.session.usuario.id);
@@ -279,6 +296,7 @@ router.put('/cambiar-password', (req, res) => {
 
     const nuevoHash = bcrypt.hashSync(password_nuevo, 12);
     db.prepare('UPDATE usuarios SET password = ? WHERE id = ?').run(nuevoHash, usuario.id);
+    registrarAuditoria({ req, accion: 'password_cambiada', detalle: { usuarioId: usuario.id } });
     res.json({ ok: true, mensaje: 'Contraseña actualizada' });
   } catch (err) {
     res.status(500).json({ ok: false, error: 'No se pudo cambiar la contraseña' });

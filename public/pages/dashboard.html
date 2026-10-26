@@ -1,74 +1,85 @@
 <div class="page active" id="page-dashboard">
-    <div class="page-intro">
-      <div><p class="eyebrow">RESUMEN COMERCIAL</p><h2>Tu operación, de un vistazo</h2></div>
-      <span class="period-chip"><span class="status-dot"></span> Actividad del mes</span>
+  <div class="page-intro">
+    <div>
+      <p class="eyebrow">RESUMEN DEL NEGOCIO</p>
+      <h2>Panel de control</h2>
     </div>
-    <div class="stats-grid">
-      <div class="stat-card blue">
-        <div class="stat-label">Ventas hoy</div>
-        <div class="stat-value blue mono" id="stat-hoy">S/ 0.00</div>
-        <div class="stat-sub">IGV incluido</div>
-      </div>
-      <div class="stat-card green">
-        <div class="stat-label">Ventas del mes</div>
-        <div class="stat-value green mono" id="stat-mes">S/ 0.00</div>
-        <div class="stat-sub">IGV incluido</div>
-      </div>
-      <div class="stat-card blue">
-        <div class="stat-label">Clientes</div>
-        <div class="stat-value blue" id="stat-clientes">0</div>
-        <div class="stat-sub">registrados</div>
-      </div>
-      <div class="stat-card green">
-        <div class="stat-label">Productos</div>
-        <div class="stat-value green" id="stat-productos">0</div>
-        <div class="stat-sub">en catálogo</div>
-      </div>
-      <div class="stat-card yellow">
-        <div class="stat-label">Stock bajo</div>
-        <div class="stat-value yellow" id="stat-stock">0</div>
-        <div class="stat-sub">productos ≤ 5 uds</div>
-      </div>
-      <div class="stat-card blue">
-        <div class="stat-label">Facturas totales</div>
-        <div class="stat-value blue" id="stat-facturas">0</div>
-        <div class="stat-sub">emitidas</div>
-      </div>
-      <div class="stat-card red">
-        <div class="stat-label">Por cobrar (crédito)</div>
-        <div class="stat-value red mono" id="stat-por-cobrar">S/ 0.00</div>
-        <div class="stat-sub" id="stat-por-cobrar-sub">pendiente</div>
-      </div>
-    </div>
+    <button class="btn btn-primary" type="button" onclick="goTo('ventas')">＋ Nueva venta</button>
+  </div>
 
-    <div class="dashboard-grid">
-      <div class="table-card">
-        <div class="table-header"><h2>🏆 Top Productos</h2></div>
-        <table>
-          <thead><tr><th>Producto</th><th>Unidades</th><th>Ingresos</th></tr></thead>
-          <tbody id="top-productos-body">
-            <tr><td colspan="3"><div class="empty"><p>Sin datos aún</p></div></td></tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="table-card">
-        <div class="table-header"><h2>⭐ Mejores Clientes</h2></div>
-        <table>
-          <thead><tr><th>Cliente</th><th>Facturas</th><th>Total</th></tr></thead>
-          <tbody id="top-clientes-body">
-            <tr><td colspan="3"><div class="empty"><p>Sin datos aún</p></div></td></tr>
-          </tbody>
-        </table>
-      </div>
+  <div class="stats-grid dashboard-stats">
+    <div class="stat-card green">
+      <div class="stat-label">VENTAS DE HOY</div>
+      <div class="stat-value green mono" id="stat-hoy">S/ 0.00</div>
+      <div class="stat-sub">Total vendido hoy</div>
     </div>
-
-    <div class="table-card panel-spacing">
-      <div class="table-header"><h2>💳 Créditos pendientes</h2></div>
-      <table>
-        <thead><tr><th>Comprobante</th><th>Cliente</th><th>Vencimiento</th><th>Monto</th><th>Estado</th></tr></thead>
-        <tbody id="creditos-pendientes-body">
-          <tr><td colspan="5"><div class="empty"><p>Sin créditos pendientes</p></div></td></tr>
-        </tbody>
-      </table>
+    <div class="stat-card blue">
+      <div class="stat-label">VENTAS DEL MES</div>
+      <div class="stat-value blue mono" id="stat-mes">S/ 0.00</div>
+      <div class="stat-sub">Acumulado del mes actual</div>
+    </div>
+    <div class="stat-card yellow">
+      <div class="stat-label">CUENTAS POR COBRAR</div>
+      <div class="stat-value yellow mono" id="stat-por-cobrar">S/ 0.00</div>
+      <div class="stat-sub" id="stat-por-cobrar-sub">Pendiente</div>
+    </div>
+    <div class="stat-card red">
+      <div class="stat-label">PRODUCTOS CON STOCK BAJO</div>
+      <div class="stat-value red mono" id="stat-stock">0</div>
+      <div class="stat-sub">Requieren reposición</div>
+    </div>
+    <div class="stat-card blue">
+      <div class="stat-label">CLIENTES</div>
+      <div class="stat-value blue mono" id="stat-clientes">0</div>
+      <div class="stat-sub">Registrados en el sistema</div>
+    </div>
+    <div class="stat-card green">
+      <div class="stat-label">PRODUCTOS</div>
+      <div class="stat-value green mono" id="stat-productos">0</div>
+      <div class="stat-sub">En el catálogo</div>
+    </div>
+    <div class="stat-card yellow">
+      <div class="stat-label">COMPROBANTES EMITIDOS</div>
+      <div class="stat-value yellow mono" id="stat-facturas">0</div>
+      <div class="stat-sub">Facturas y boletas vigentes</div>
     </div>
   </div>
+
+  <div class="dashboard-grid">
+    <section class="table-card">
+      <div class="table-header">
+        <h2>🏆 Productos más vendidos</h2>
+        <button class="btn btn-ghost btn-sm" type="button" onclick="goTo('reportes')">Ver reportes</button>
+      </div>
+      <table>
+        <thead><tr><th>Producto</th><th>Unidades</th><th>Ingresos</th></tr></thead>
+        <tbody id="top-productos-body"><tr><td colspan="3"><div class="empty"><p>Cargando datos...</p></div></td></tr></tbody>
+      </table>
+    </section>
+
+    <section class="table-card">
+      <div class="table-header">
+        <h2>👥 Mejores clientes</h2>
+        <button class="btn btn-ghost btn-sm" type="button" onclick="goTo('clientes')">Ver clientes</button>
+      </div>
+      <table>
+        <thead><tr><th>Cliente</th><th>Compras</th><th>Total</th></tr></thead>
+        <tbody id="top-clientes-body"><tr><td colspan="3"><div class="empty"><p>Cargando datos...</p></div></td></tr></tbody>
+      </table>
+    </section>
+  </div>
+
+  <section class="table-card panel-spacing">
+    <div class="table-header">
+      <div>
+        <h2>💳 Créditos pendientes</h2>
+        <p class="sales-subtitle">Comprobantes a crédito pendientes de pago.</p>
+      </div>
+      <button class="btn btn-ghost btn-sm" type="button" onclick="goTo('facturas')">Ver comprobantes</button>
+    </div>
+    <table>
+      <thead><tr><th>Comprobante</th><th>Cliente</th><th>Vencimiento</th><th>Total</th><th>Estado</th></tr></thead>
+      <tbody id="creditos-pendientes-body"><tr><td colspan="5"><div class="empty"><p>Cargando datos...</p></div></td></tr></tbody>
+    </table>
+  </section>
+</div>

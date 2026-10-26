@@ -7,6 +7,8 @@ const rateLimit = require('express-rate-limit');
 const path = require('node:path');
 const fs = require('node:fs');
 const SQLiteSessionStore = require('./services/sqlite-session-store');
+const PostgresSessionStore = require('./services/postgres-session-store');
+const { validarBodyObject } = require('./middleware/seguridad');
 
 const sessionSecret = process.env.SESSION_SECRET;
 if (!sessionSecret) {
@@ -69,9 +71,44 @@ if (offsiteBackupDirectory && (
   throw new Error('BACKUP_OFFSITE_DIR debe estar separado de BACKUP_DIR y de la base de datos.');
 }
 
-const db = require('./database');
+const databaseBackend = process.env.DB_PATH === ':memory:'
+  ? 'sqlite'
+  : (process.env.DATABASE_BACKEND || 'postgres');
+if (!['postgres', 'sqlite'].includes(databaseBackend)) {
+  throw new Error('DATABASE_BACKEND debe ser postgres o sqlite.');
+}
+const db = databaseBackend === 'sqlite' ? require('./database') : require('./database-postgres');
+const sessionStore = databaseBackend === 'sqlite'
+  ? new SQLiteSessionStore(db)
+  : new PostgresSessionStore(db);
+const rutas = databaseBackend === 'postgres'
+  ? {
+    auth: './routes/postgres/auth',
+    clientes: './routes/postgres/clientes',
+    productos: './routes/postgres/productos',
+    inventario: './routes/postgres/inventario',
+    compras: './routes/postgres/compras',
+    proveedores: './routes/postgres/proveedores',
+    tipoCambio: './routes/postgres/tipo-cambio',
+    comprobantes: './routes/postgres/comprobantes',
+    reportes: './routes/postgres/reportes',
+    pdf: './routes/postgres/pdf',
+  }
+  : {
+    auth: './routes/auth',
+    clientes: './routes/clientes',
+    productos: './routes/productos',
+    inventario: './routes/inventario',
+    compras: './routes/compras',
+    proveedores: './routes/proveedores',
+    tipoCambio: './routes/tipo-cambio',
+    comprobantes: './routes/comprobantes',
+    reportes: './routes/reportes',
+    pdf: './routes/pdf',
+  };
 
 const app  = express();
+app.disable('x-powered-by');
 if (trustProxyHops > 0) app.set('trust proxy', trustProxyHops);
 const useBuiltAssets = process.env.NODE_ENV === 'production'
   || process.env.FRONTEND_ASSET_MODE === 'production';
@@ -115,14 +152,16 @@ app.use(helmet({
     },
   },
 }));
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+app.use(validarBodyObject);
 app.use(session({
   secret: sessionSecret,
-  store: new SQLiteSessionStore(db),
+  store: sessionStore,
   resave: false,
   saveUninitialized: false,
   cookie: {
-    maxAge: 8 * 60 * 60 * 1000,
+    maxAge: 60 * 60 * 1000,
     httpOnly: true,
     sameSite: 'lax',
     secure: isProduction,
@@ -144,9 +183,10 @@ function requiereLogin(req, res, next) {
   next();
 }
 
-app.get('/api/health', (req, res) => {
+app.get('/api/health', async (_req, res) => {
   try {
-    db.prepare('SELECT 1').get();
+    if (databaseBackend === 'postgres') await db.healthCheck();
+    else db.prepare('SELECT 1').get();
     res.json({ ok: true });
   } catch {
     res.status(503).json({ ok: false, error: 'Base de datos no disponible' });
@@ -154,18 +194,18 @@ app.get('/api/health', (req, res) => {
 });
 
 // Rutas públicas
-app.use('/api/auth', require('./routes/auth'));
+app.use('/api/auth', require(rutas.auth));
 
 // Rutas protegidas
-app.use('/api/clientes',     requiereLogin, require('./routes/clientes'));
-app.use('/api/productos',    requiereLogin, require('./routes/productos'));
-app.use('/api/inventario',    requiereLogin, require('./routes/inventario'));
-app.use('/api/compras',      requiereLogin, require('./routes/compras'));
-app.use('/api/proveedores',  requiereLogin, require('./routes/proveedores'));
-app.use('/api/tipo-cambio',  requiereLogin, require('./routes/tipo-cambio'));
-app.use('/api/comprobantes', requiereLogin, require('./routes/comprobantes'));
-app.use('/api/reportes',     requiereLogin, require('./routes/reportes'));
-app.use('/api/pdf',          requiereLogin, require('./routes/pdf'));
+app.use('/api/clientes',     requiereLogin, require(rutas.clientes));
+app.use('/api/productos',    requiereLogin, require(rutas.productos));
+app.use('/api/inventario',   requiereLogin, require(rutas.inventario));
+app.use('/api/compras',      requiereLogin, require(rutas.compras));
+app.use('/api/proveedores',  requiereLogin, require(rutas.proveedores));
+app.use('/api/tipo-cambio',  requiereLogin, require(rutas.tipoCambio));
+app.use('/api/comprobantes', requiereLogin, require(rutas.comprobantes));
+app.use('/api/reportes',     requiereLogin, require(rutas.reportes));
+app.use('/api/pdf',          requiereLogin, require(rutas.pdf));
 
 app.use('/api', (req, res) => {
   res.status(404).json({ ok: false, error: 'Ruta no encontrada' });
@@ -199,10 +239,21 @@ app.use((error, req, res, next) => {
 });
 
 if (require.main === module) {
-  app.listen(PORT, HOST, () => {
-    console.log(`✓ Servidor corriendo en http://${HOST}:${PORT}`);
-    console.log(`✓ Entorno: ${process.env.NODE_ENV || 'development'}`);
-  });
+  Promise.resolve(databaseBackend === 'postgres' ? db.initialize() : undefined)
+    .then(() => app.listen(PORT, HOST, () => {
+      console.log(`✓ Servidor corriendo en http://${HOST}:${PORT}`);
+      console.log(`✓ Entorno: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`✓ Base de datos: ${databaseBackend}`);
+    }))
+    .catch(error => {
+      console.error(JSON.stringify({
+        level: 'error',
+        timestamp: new Date().toISOString(),
+        event: 'database_initialization_failed',
+        error: error.name || 'Error',
+      }));
+      process.exitCode = 1;
+    });
 }
 
 module.exports = app;

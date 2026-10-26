@@ -121,7 +121,7 @@
           stylesheet.addEventListener('load', resolve, { once: true });
           stylesheet.addEventListener('error', () => reject(new Error(`No se pudo cargar la hoja de estilos ${href}.`)), { once: true });
         }));
-        document.head.insertBefore(stylesheet, document.getElementById('base-stylesheet'));
+        document.head.append(stylesheet);
       }
       link.remove();
     });
