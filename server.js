@@ -241,7 +241,8 @@ app.use((error, req, res, next) => {
 if (require.main === module) {
   Promise.resolve(databaseBackend === 'postgres' ? db.initialize() : undefined)
     .then(() => app.listen(PORT, HOST, () => {
-      console.log(`✓ Servidor corriendo en http://${HOST}:${PORT}`);
+      const browserHost = ['0.0.0.0', '::'].includes(HOST) ? 'localhost' : HOST;
+      console.log(`✓ Servidor corriendo en http://${browserHost}:${PORT}`);
       console.log(`✓ Entorno: ${process.env.NODE_ENV || 'development'}`);
       console.log(`✓ Base de datos: ${databaseBackend}`);
     }))
