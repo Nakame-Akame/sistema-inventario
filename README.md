@@ -511,7 +511,7 @@ Los registros de compra conservan el nombre/documento/dirección del proveedor c
 - **Tipo de cambio:** consulta el servicio externo de tipo de cambio SUNAT y almacena la tasa del día; si la consulta falla, puede reutilizar la última tasa guardada. No reemplaza una tasa contable aprobada por el negocio.
 - **SUNAT:** solo configuración para pruebas `beta` y `homologation`. No implementar uso real antes de incorporar XML, firma con certificado, envío, respuesta CDR, pruebas integrales y definición de un PSE autorizado.
 - **PDF:** Puppeteer genera A4 o ticket térmico de 80/58 mm. Windows usa Chrome local (configurable con `CHROME_EXECUTABLE_PATH`); Linux puede usar Chromium de Sparticuz.
-- **Excel:** los reportes disponibles se generan con la biblioteca `xlsx`.
+- **Excel:** los reportes y la importación de productos usan SheetJS CE 0.20.3 desde su CDN oficial. El paquete `xlsx` publicado en npm sigue en 0.18.5 y no contiene las correcciones de seguridad de esa versión.
 - **Almacenamiento de sesiones:** las sesiones se guardan en la misma base SQLite persistente, expiran a las ocho horas y se eliminan al cerrar sesión. Mantén una sola instancia de Node mientras SQLite sea la base de datos; SQLite en disco local no está pensado para varias instancias distribuidas.
 
 ### Comandos para desarrollo y mantenimiento
